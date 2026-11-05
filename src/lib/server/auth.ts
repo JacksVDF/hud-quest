@@ -22,6 +22,8 @@ export function createAuth(env: Cloudflare.Env, baseURL: string) {
 			requireEmailVerification: false,
 			autoSignIn: true
 		},
+		// Deleting an account is always confirmed with the password (see hooks.server.ts).
+		user: { deleteUser: { enabled: true } },
 		// In-memory counters are useless on Workers (each request may hit a new isolate).
 		rateLimit: {
 			enabled: true,
@@ -32,6 +34,8 @@ export function createAuth(env: Cloudflare.Env, baseURL: string) {
 			customRules: {
 				// Password guessing: room for typos, still slow for a bot (each try costs a hash).
 				'/sign-in/email': { window: 60, max: 10 },
+				// The password is checked here too.
+				'/delete-user': { window: 60, max: 5 },
 				// Mass sign-ups.
 				'/sign-up/email': { window: 60, max: 5 },
 				// The page asks for the session on every load, so reloads must not lock anyone out.

@@ -11,6 +11,19 @@ export const handle: Handle = async ({ event, resolve }) => {
 		return resolve(event);
 	}
 
+	// Without a password Better Auth only needs a recent session, so a stolen cookie could
+	// delete the account. Always require the password.
+	if (event.url.pathname === '/api/auth/delete-user') {
+		const body: unknown = await event.request
+			.clone()
+			.json()
+			.catch(() => null);
+		const password = (body as { password?: unknown } | null)?.password;
+		if (typeof password !== 'string' || password === '') {
+			return Response.json({ message: 'Password required' }, { status: 400 });
+		}
+	}
+
 	const auth = createAuth(env, event.url.origin);
 	const session = await auth.api.getSession({ headers: event.request.headers });
 	event.locals.user = session

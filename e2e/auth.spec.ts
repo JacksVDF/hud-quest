@@ -203,3 +203,45 @@ test('a second tab that saved first makes the first tab stop and offer a reload'
 		.toBe(2);
 	await context.close();
 });
+
+test('deletes the account after confirming the password, with all its data', async ({
+	page,
+	context
+}) => {
+	const email = uniqueEmail();
+	await signUp(page, email);
+	await page.getByLabel('NEW_TASK_').fill('Doomed task');
+	await page.getByRole('button', { name: /^ADD >/ }).click();
+	await expect
+		.poll(async () => (await (await page.request.get('/api/tasks')).json()).length)
+		.toBe(1);
+
+	await page.getByTestId('account-email').click();
+	await expect(page).toHaveURL(/\/account$/);
+	await page.getByRole('button', { name: 'DELETE ACCOUNT' }).click();
+
+	// A wrong password deletes nothing.
+	await page.getByLabel('CONFIRM_PASSWORD_').fill('not-the-password');
+	await page.getByRole('button', { name: /DELETE FOREVER/ }).click();
+	await expect(page.getByRole('alert')).toHaveText(/Wrong password/);
+	expect((await page.request.get('/api/tasks')).status()).toBe(200);
+
+	await page.getByLabel('CONFIRM_PASSWORD_').fill(PASSWORD);
+	await page.getByRole('button', { name: /DELETE FOREVER/ }).click();
+	await expect(page).toHaveURL('/');
+	await expect(page.getByRole('link', { name: 'LOGIN' })).toBeVisible();
+	expect((await page.request.get('/api/tasks')).status()).toBe(401);
+
+	// The account is gone: the same credentials no longer work.
+	await page.goto('/login');
+	await fillAndSubmit(page, email, PASSWORD, /LOGIN >/);
+	await expect(page.getByRole('alert')).toHaveText(/Wrong email or password/);
+	await context.clearCookies();
+});
+
+test('deleting an account requires the password in the request', async ({ page }) => {
+	await signUp(page, uniqueEmail());
+	const res = await page.request.post('/api/auth/delete-user', { data: {} });
+	expect(res.status()).toBe(400);
+	expect((await page.request.get('/api/tasks')).status()).toBe(200);
+});

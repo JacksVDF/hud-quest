@@ -9,13 +9,14 @@
 {#if session.ready}
 	{#if session.email}
 		<div class="flex items-center gap-3">
-			<span
-				class="max-w-40 truncate text-xs sm:max-w-64"
-				title={session.email}
+			<a
+				class="max-w-40 truncate text-xs underline sm:max-w-64"
+				href={resolve('/account')}
+				title="Account settings"
 				data-testid="account-email"
 			>
 				{session.email}
-			</span>
+			</a>
 			<button type="button" class="btn o sm" onclick={onsignout}>LOGOUT</button>
 		</div>
 	{:else}
