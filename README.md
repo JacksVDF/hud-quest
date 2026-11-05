@@ -8,7 +8,7 @@ A to-do app where finishing tasks earns XP. Built with SvelteKit (Svelte 5), Typ
 npm install
 npm run dev        # development server
 npm run build      # Cloudflare Worker + assets in .svelte-kit/cloudflare
-npm run preview    # serve the production build locally
+npx wrangler dev   # run the built Worker locally (workerd + local D1)
 npm run deploy     # build and deploy to Cloudflare (needs `npx wrangler login` once)
 ```
 

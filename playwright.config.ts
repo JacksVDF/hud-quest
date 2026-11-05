@@ -10,7 +10,10 @@ export default defineConfig({
 		channel: 'chrome'
 	},
 	webServer: {
-		command: 'npm run build && npm run preview -- --host 127.0.0.1 --port 4173 --strictPort',
+		// The built Worker imports `cloudflare:workers`, so it must run in workerd, not in `vite preview`.
+		// Migrations run on the local D1 first so the auth tables exist.
+		command:
+			'npm run build && wrangler d1 migrations apply hud-quest-db --local && wrangler dev --ip 127.0.0.1 --port 4173',
 		url: 'http://127.0.0.1:4173',
 		reuseExistingServer: false,
 		timeout: 120_000
