@@ -89,6 +89,7 @@ test('an account has its own task list, and guest tasks come back after logout',
 	await signUp(page, uniqueEmail());
 	await expect(page.getByText('No tasks yet')).toBeVisible();
 	await expect(page.getByText('Guest task')).toHaveCount(0);
+	await page.getByRole('button', { name: 'NOT NOW' }).click();
 
 	await page.getByLabel('NEW_TASK_').fill('Account task');
 	await page.getByRole('button', { name: /^ADD >/ }).click();
@@ -120,4 +121,44 @@ test('account tasks follow the user to another browser session', async ({ page, 
 	await fillAndSubmit(page2, email, PASSWORD, /LOGIN >/);
 	await expect(page2.getByText('Everywhere')).toBeVisible();
 	await other.close();
+});
+
+test('imports guest tasks into the account once, then offers nothing more', async ({ page }) => {
+	await page.goto('/');
+	await expect(page.getByText('loading…')).toHaveCount(0);
+	for (const title of ['First guest', 'Second guest']) {
+		await page.getByLabel('NEW_TASK_').fill(title);
+		await page.getByRole('button', { name: /^ADD >/ }).click();
+		await expect(page.getByText(title)).toBeVisible();
+	}
+
+	const email = uniqueEmail();
+	await signUp(page, email);
+	await expect(page.getByTestId('import-prompt')).toContainText('2 tasks');
+	await page.getByRole('button', { name: /IMPORT/ }).click();
+	await expect(page.getByText('Imported 2 tasks into your account.')).toBeVisible();
+	await expect(page.getByText('First guest')).toBeVisible();
+	await expect(page.getByText('Second guest')).toBeVisible();
+	await expect(page.getByTestId('import-prompt')).toHaveCount(0);
+
+	// Saved in the account, and the browser copy is gone: no second offer after a reload.
+	await page.reload();
+	await expect(page.getByText('First guest')).toBeVisible();
+	await expect(page.getByTestId('import-prompt')).toHaveCount(0);
+
+	// As a guest again, the browser list is empty.
+	await page.getByRole('button', { name: 'LOGOUT' }).click();
+	await expect(page.getByText('No tasks yet')).toBeVisible();
+});
+
+test('keeps guest tasks in the browser when the import is skipped', async ({ page }) => {
+	await page.goto('/');
+	await expect(page.getByText('loading…')).toHaveCount(0);
+	await page.getByLabel('NEW_TASK_').fill('Keep me');
+	await page.getByRole('button', { name: /^ADD >/ }).click();
+	await signUp(page, uniqueEmail());
+	await page.getByRole('button', { name: 'NOT NOW' }).click();
+	await expect(page.getByTestId('import-prompt')).toHaveCount(0);
+	await page.getByRole('button', { name: 'LOGOUT' }).click();
+	await expect(page.getByText('Keep me')).toBeVisible();
 });

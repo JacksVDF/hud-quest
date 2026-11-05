@@ -67,6 +67,26 @@ export class TaskStore {
 		}
 	}
 
+	/**
+	 * Adds tasks that are not in the list yet (matched by id) and waits until they are saved.
+	 * Returns how many were added. If saving fails the list is restored and the error is thrown.
+	 */
+	async importTasks(incoming: Task[]): Promise<number> {
+		if (!this.loaded) return 0;
+		const known = this.tasks.map((t) => t.id);
+		const fresh = incoming.filter((t) => !known.includes(t.id));
+		if (fresh.length === 0) return 0;
+		const before = this.tasks;
+		this.tasks = [...before, ...fresh];
+		try {
+			await this.#storage.save(this.tasks);
+		} catch (e) {
+			this.tasks = before;
+			throw e;
+		}
+		return fresh.length;
+	}
+
 	/** Runs a mutation, saves, and reports the XP and level difference. */
 	#change(mutate: () => void): Change {
 		const xpBefore = this.xp;

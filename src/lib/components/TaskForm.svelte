@@ -3,8 +3,14 @@
 	import TagInput from './TagInput.svelte';
 	import type { Complexity } from '#lib/xp.ts';
 
-	let { onadd }: { onadd: (title: string, complexity: Complexity, tags: string[]) => void } =
-		$props();
+	let {
+		onadd,
+		disabled = false
+	}: {
+		onadd: (title: string, complexity: Complexity, tags: string[]) => void;
+		/** True while the task list is still loading, so nothing typed is silently dropped. */
+		disabled?: boolean;
+	} = $props();
 
 	let title = $state('');
 	let complexity = $state<Complexity>('easy');
@@ -12,7 +18,7 @@
 
 	function submit(e: SubmitEvent) {
 		e.preventDefault();
-		if (!title.trim()) return;
+		if (disabled || !title.trim()) return;
 		onadd(title, complexity, tags);
 		title = '';
 		tags = [];
@@ -37,7 +43,11 @@
 		<div class="sm:max-w-sm sm:flex-1">
 			<TagInput bind:tags />
 		</div>
-		<button type="submit" class="btn g self-start sm:self-auto" disabled={!title.trim()}>
+		<button
+			type="submit"
+			class="btn g self-start sm:self-auto"
+			disabled={disabled || !title.trim()}
+		>
 			ADD &gt;
 		</button>
 	</div>

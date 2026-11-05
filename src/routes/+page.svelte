@@ -10,10 +10,15 @@
 	import ThemeToggle from '#lib/components/ThemeToggle.svelte';
 	import { ms } from '#lib/motion.ts';
 	import { session } from '#lib/session.svelte.ts';
-	import { createLocalStorage, createRemoteStorage } from '#lib/storage.ts';
+	import {
+		clearGuestTasks,
+		createLocalStorage,
+		createRemoteStorage,
+		readGuestTasks
+	} from '#lib/storage.ts';
 	import { clampPage, pageCount, paginate } from '#lib/pagination.ts';
 	import { taskStore, type Change } from '#lib/task-store.svelte.ts';
-	import { allTags, filterTasks, type StatusFilter } from '#lib/tasks.ts';
+	import { allTags, filterTasks, type StatusFilter, type Task } from '#lib/tasks.ts';
 
 	let message = $state('');
 	// Filters live only in memory, so they reset on reload.
@@ -25,9 +30,27 @@
 	onMount(async () => {
 		await session.refresh();
 		await taskStore.useStorage(session.email ? createRemoteStorage() : createLocalStorage());
+		guestTasks = session.email ? readGuestTasks() : [];
 	});
 
+	// Tasks made as a guest in this browser, offered to the account once after logging in.
+	let guestTasks = $state<Task[]>([]);
+	let importFailed = $state(false);
+
+	async function importGuestTasks() {
+		importFailed = false;
+		try {
+			const added = await taskStore.importTasks(guestTasks);
+			clearGuestTasks();
+			guestTasks = [];
+			message = `[✓] Imported ${added} task${added === 1 ? '' : 's'} into your account.`;
+		} catch {
+			importFailed = true;
+		}
+	}
+
 	async function signOut() {
+		guestTasks = [];
 		await session.signOut();
 		await taskStore.useStorage(createLocalStorage());
 	}
@@ -104,7 +127,10 @@
 
 		<LevelCard info={taskStore.levelInfo} totalXp={taskStore.xp} />
 
-		<TaskForm onadd={(title, c, tags) => taskStore.add(title, c, tags)} />
+		<TaskForm
+			disabled={!taskStore.loaded}
+			onadd={(title, c, tags) => taskStore.add(title, c, tags)}
+		/>
 
 		<!-- Old and new banners share one grid cell so a replaced message cross-fades in place. -->
 		<div aria-live="polite" class="grid min-h-12">
@@ -132,6 +158,24 @@
 				{/if}
 			{/key}
 		</div>
+
+		{#if taskStore.loaded && guestTasks.length > 0}
+			<div class="flex flex-col gap-3 border-2 border-f p-3 text-sm" data-testid="import-prompt">
+				<p>
+					&gt; Found {guestTasks.length} task{guestTasks.length === 1 ? '' : 's'} saved in this browser
+					as a guest. Add {guestTasks.length === 1 ? 'it' : 'them'} to your account?
+				</p>
+				{#if importFailed}
+					<p role="alert">[!] Could not import. Try again.</p>
+				{/if}
+				<div class="flex flex-wrap gap-3">
+					<button type="button" class="btn g sm" onclick={importGuestTasks}>IMPORT &gt;</button>
+					<button type="button" class="btn o sm" onclick={() => (guestTasks = [])}>
+						NOT NOW
+					</button>
+				</div>
+			</div>
+		{/if}
 
 		{#if taskStore.problem === 'save'}
 			<p class="border-2 border-f p-3 text-sm" role="alert">

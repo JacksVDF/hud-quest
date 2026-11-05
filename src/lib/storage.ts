@@ -7,10 +7,19 @@ export interface TaskStorage {
 	save(tasks: Task[]): void | Promise<void>;
 }
 
+/** The guest list kept in this browser. Only call on the client. */
+export function readGuestTasks(): Task[] {
+	return parseTasks(localStorage.getItem(STORAGE_KEY));
+}
+
+export function clearGuestTasks() {
+	localStorage.removeItem(STORAGE_KEY);
+}
+
 /** Browser storage for guests. `localStorage` is read lazily, so it is safe to create on the server. */
 export function createLocalStorage(): TaskStorage {
 	return {
-		load: () => parseTasks(localStorage.getItem(STORAGE_KEY)),
+		load: readGuestTasks,
 		save: (tasks) => localStorage.setItem(STORAGE_KEY, JSON.stringify(tasks))
 	};
 }

@@ -331,3 +331,34 @@ describe('createRemoteStorage', () => {
 		expect(order).toEqual(['start one', 'end one', 'start two', 'end two']);
 	});
 });
+
+describe('TaskStore importTasks', () => {
+	it('adds only tasks it does not have yet and saves once', async () => {
+		const saves: Task[][] = [];
+		const store = new TaskStore({
+			load: () => [seed('a')],
+			save: (t) => void saves.push(structuredClone(t))
+		});
+		store.load();
+		const added = await store.importTasks([seed('a'), seed('b'), seed('c')]);
+		expect(added).toBe(2);
+		expect(store.tasks.map((t) => t.id)).toEqual(['a', 'b', 'c']);
+		expect(saves).toHaveLength(1);
+	});
+
+	it('does nothing before the list is loaded', async () => {
+		const store = new TaskStore({ load: () => [], save: () => {} });
+		expect(await store.importTasks([seed('a')])).toBe(0);
+		expect(store.tasks).toEqual([]);
+	});
+
+	it('restores the list and throws when saving fails', async () => {
+		const store = new TaskStore({
+			load: () => [seed('a')],
+			save: () => Promise.reject(new Error('offline'))
+		});
+		store.load();
+		await expect(store.importTasks([seed('b')])).rejects.toThrow();
+		expect(store.tasks.map((t) => t.id)).toEqual(['a']);
+	});
+});
