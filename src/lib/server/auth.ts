@@ -28,10 +28,14 @@ export function createAuth(env: Cloudflare.Env, baseURL: string) {
 			storage: 'database',
 			window: 60,
 			max: 30,
+			// Counters are per IP and per path, so each rule below has its own bucket.
 			customRules: {
-				// Stricter for password guessing and mass sign-ups: 5 tries per minute.
-				'/sign-in/email': { window: 60, max: 5 },
-				'/sign-up/email': { window: 60, max: 5 }
+				// Password guessing: room for typos, still slow for a bot (each try costs a hash).
+				'/sign-in/email': { window: 60, max: 10 },
+				// Mass sign-ups.
+				'/sign-up/email': { window: 60, max: 5 },
+				// The page asks for the session on every load, so reloads must not lock anyone out.
+				'/get-session': { window: 60, max: 120 }
 			}
 		},
 		// Cloudflare sets this header and replaces any client value.

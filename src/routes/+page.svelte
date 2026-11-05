@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { fade, fly } from 'svelte/transition';
+	import AccountMenu from '#lib/components/AccountMenu.svelte';
 	import FilterBar from '#lib/components/FilterBar.svelte';
 	import LevelCard from '#lib/components/LevelCard.svelte';
 	import Pagination from '#lib/components/Pagination.svelte';
@@ -80,7 +81,10 @@
 <div class="mx-auto max-w-3xl px-4 pb-16 sm:px-6">
 	<header class="flex items-center justify-between gap-4 py-5">
 		<div class="h text-lg tracking-widest sm:text-xl">X HUD//QUEST</div>
-		<ThemeToggle />
+		<div class="flex items-center gap-3">
+			<AccountMenu />
+			<ThemeToggle />
+		</div>
 	</header>
 	<div class="gl h-1 grow" aria-hidden="true"></div>
 

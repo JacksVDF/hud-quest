@@ -1,0 +1,27 @@
+<script lang="ts">
+	import { onMount } from 'svelte';
+	import { resolve } from '$app/paths';
+	import { session } from '#lib/session.svelte.ts';
+
+	onMount(() => {
+		void session.refresh();
+	});
+</script>
+
+<!-- Hidden until the session is known, so signed-in users never see a flash of LOGIN. -->
+{#if session.ready}
+	{#if session.email}
+		<div class="flex items-center gap-3">
+			<span
+				class="max-w-40 truncate text-xs sm:max-w-64"
+				title={session.email}
+				data-testid="account-email"
+			>
+				{session.email}
+			</span>
+			<button type="button" class="btn o sm" onclick={() => session.signOut()}>LOGOUT</button>
+		</div>
+	{:else}
+		<a class="btn o sm" href={resolve('/login')}>LOGIN</a>
+	{/if}
+{/if}
