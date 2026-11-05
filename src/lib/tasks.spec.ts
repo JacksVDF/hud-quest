@@ -8,6 +8,7 @@ import {
 	parseTasks,
 	reconcileDone,
 	taskXp,
+	toTasks,
 	totalXp,
 	type Item,
 	type Task
@@ -231,5 +232,27 @@ describe('parseTasks', () => {
 		const raw = task({ complexity: 'hard', done: true, items: [item('a', true), item('b')] });
 		const [t] = parseTasks(JSON.stringify([raw]));
 		expect(t.done).toBe(false);
+	});
+});
+
+describe('toTasks (untrusted input)', () => {
+	it('returns null when the data is not a list', () => {
+		expect(toTasks({})).toBeNull();
+		expect(toTasks('x')).toBeNull();
+		expect(toTasks(null)).toBeNull();
+	});
+
+	it('drops invalid entries and keeps valid ones', () => {
+		const result = toTasks([task({ id: 'ok' }), { id: 1 }, null]);
+		expect(result?.map((t) => t.id)).toEqual(['ok']);
+	});
+
+	it('sanitizes fields: tag limits, notes only on hard tasks', () => {
+		const result = toTasks([
+			task({ tags: ['A', 'b', 'c', 'd'], notes: 'nope' }),
+			task({ id: '2', complexity: 'hard', notes: 'x'.repeat(2000) })
+		]);
+		expect(result?.[0]).toMatchObject({ tags: ['a', 'b', 'c'], notes: '' });
+		expect(result?.[1].notes).toHaveLength(1000);
 	});
 });

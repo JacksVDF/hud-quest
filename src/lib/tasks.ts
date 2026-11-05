@@ -146,12 +146,16 @@ function toTask(value: unknown): Task | null {
 	return task;
 }
 
+/** Validates untrusted data; returns null unless it is an array, and drops invalid entries. */
+export function toTasks(data: unknown): Task[] | null {
+	return Array.isArray(data) ? data.map(toTask).filter((t): t is Task => t !== null) : null;
+}
+
 /** Parse saved JSON; returns [] for anything missing or malformed. */
 export function parseTasks(json: string | null): Task[] {
 	if (!json) return [];
 	try {
-		const data: unknown = JSON.parse(json);
-		return Array.isArray(data) ? data.map(toTask).filter((t): t is Task => t !== null) : [];
+		return toTasks(JSON.parse(json)) ?? [];
 	} catch {
 		return [];
 	}
