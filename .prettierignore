@@ -9,3 +9,4 @@ bun.lockb
 /static/
 /test-results
 /playwright-report
+.wrangler

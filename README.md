@@ -1,14 +1,15 @@
 # HUD//QUEST — Gamified To-Do
 
-A to-do app where finishing tasks earns XP. Built with SvelteKit (Svelte 5), TypeScript and Tailwind CSS, styled after the "HUD Quest" design (monochrome light/dark themes, corner brackets, gradient accent).
+A to-do app where finishing tasks earns XP. Built with SvelteKit (Svelte 5), TypeScript and Tailwind CSS, deployed on Cloudflare Workers, styled after the "HUD Quest" design (monochrome light/dark themes, corner brackets, gradient accent).
 
 ## Run it
 
 ```sh
 npm install
 npm run dev        # development server
-npm run build      # static site in ./build
-npm run preview    # serve the production build
+npm run build      # Cloudflare Worker + assets in .svelte-kit/cloudflare
+npm run preview    # serve the production build locally
+npm run deploy     # build and deploy to Cloudflare (needs `npx wrangler login` once)
 ```
 
 ## Checks
