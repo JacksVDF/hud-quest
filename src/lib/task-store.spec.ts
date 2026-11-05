@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { createRemoteStorage } from './storage';
+import { ConflictError, createRemoteStorage } from './storage';
 import { STORAGE_KEY, type Task } from './tasks';
 import { TaskStore } from './task-store.svelte';
 
@@ -296,39 +296,97 @@ describe('TaskStore with async storage', () => {
 });
 
 describe('createRemoteStorage', () => {
-	const ok = (body: unknown = {}) => new Response(JSON.stringify(body), { status: 200 });
+	const reply = (body: unknown, version: number, status = 200) =>
+		new Response(JSON.stringify(body), { status, headers: { etag: `"${version}"` } });
+	const asFetch = (f: unknown) => f as typeof fetch;
 
 	it('loads and validates the tasks from the API', async () => {
-		const fetcher = vi.fn(async () => ok([seed('a'), { id: 5 }]));
-		const tasks = await createRemoteStorage(fetcher as unknown as typeof fetch).load();
+		const fetcher = vi.fn(async () => reply([seed('a'), { id: 5 }], 3));
+		const tasks = await createRemoteStorage(asFetch(fetcher)).load();
 		expect(tasks.map((t) => t.id)).toEqual(['a']);
 	});
 
 	it('rejects when the API fails', async () => {
-		const fetcher = vi.fn(async () => new Response('no', { status: 401 }));
-		const storage = createRemoteStorage(fetcher as unknown as typeof fetch);
+		const storage = createRemoteStorage(asFetch(async () => new Response('no', { status: 401 })));
 		await expect(storage.load()).rejects.toThrow();
 		await expect(storage.save([])).rejects.toThrow();
+	});
+
+	it('refuses to save before the tasks were loaded', async () => {
+		const fetcher = vi.fn(async () => reply([], 1));
+		await expect(createRemoteStorage(asFetch(fetcher)).save([seed('a')])).rejects.toThrow();
+		expect(fetcher).not.toHaveBeenCalled();
+	});
+
+	it('sends the last known version and moves on to the one the server answers', async () => {
+		const sent: Array<string | null> = [];
+		const fetcher = vi.fn(async (_url: string, init?: RequestInit) => {
+			if (!init) return reply([], 5);
+			sent.push(new Headers(init.headers).get('if-match'));
+			return reply([], 5 + sent.length);
+		});
+		const storage = createRemoteStorage(asFetch(fetcher));
+		await storage.load();
+		await storage.save([seed('a')]);
+		await storage.save([seed('b')]);
+		expect(sent).toEqual(['"5"', '"6"']);
+	});
+
+	it('throws ConflictError on 412', async () => {
+		const fetcher = vi.fn(async (_url: string, init?: RequestInit) =>
+			init ? new Response('changed', { status: 412 }) : reply([], 1)
+		);
+		const storage = createRemoteStorage(asFetch(fetcher));
+		await storage.load();
+		await expect(storage.save([seed('a')])).rejects.toBeInstanceOf(ConflictError);
 	});
 
 	it('sends saves one at a time, in order', async () => {
 		const order: string[] = [];
 		let releaseFirst!: () => void;
 		const fetcher = vi.fn(async (_url: string, init?: RequestInit) => {
-			const label = (JSON.parse(init!.body as string) as Task[])[0].id;
+			if (!init) return reply([], 1);
+			const label = (JSON.parse(init.body as string) as Task[])[0].id;
 			order.push(`start ${label}`);
 			if (label === 'one') await new Promise<void>((r) => (releaseFirst = r));
 			order.push(`end ${label}`);
-			return ok();
+			return reply([], order.length);
 		});
-		const storage = createRemoteStorage(fetcher as unknown as typeof fetch);
+		const storage = createRemoteStorage(asFetch(fetcher));
+		await storage.load();
 		const a = storage.save([seed('one')]);
 		const b = storage.save([seed('two')]);
-		await Promise.resolve();
-		await Promise.resolve();
+		await new Promise((r) => setTimeout(r));
 		releaseFirst();
 		await Promise.all([a, b]);
 		expect(order).toEqual(['start one', 'end one', 'start two', 'end two']);
+	});
+});
+
+describe('TaskStore conflicts', () => {
+	it('stops saving after a conflict until the tasks are reloaded', async () => {
+		let conflict = true;
+		const saves: Task[][] = [];
+		const store = new TaskStore({
+			load: () => [seed('a')],
+			save: (t) => {
+				saves.push(t);
+				return conflict ? Promise.reject(new ConflictError()) : Promise.resolve();
+			}
+		});
+		store.load();
+		store.add('b', 'easy');
+		await new Promise((r) => setTimeout(r));
+		expect(store.problem).toBe('conflict');
+
+		store.add('c', 'easy');
+		expect(saves).toHaveLength(1);
+
+		conflict = false;
+		store.load();
+		expect(store.problem).toBe('');
+		store.add('d', 'easy');
+		expect(saves).toHaveLength(2);
 	});
 });
 

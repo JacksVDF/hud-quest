@@ -1,4 +1,4 @@
-import { createLocalStorage, type TaskStorage } from './storage';
+import { ConflictError, createLocalStorage, type TaskStorage } from './storage';
 import { MAX_NOTES_LENGTH, addTag, canMarkDone, reconcileDone, totalXp, type Task } from './tasks';
 import { levelFromXp } from './xp';
 import type { Complexity } from './xp';
@@ -14,8 +14,11 @@ export interface Change {
 export class TaskStore {
 	tasks = $state<Task[]>([]);
 	loaded = $state(false);
-	/** Set when the account storage failed; cleared by the next successful load or save. */
-	problem = $state<'load' | 'save' | ''>('');
+	/**
+	 * Set when the account storage failed; cleared by the next successful load or save.
+	 * `conflict` means another tab or device saved first: reload to see its version.
+	 */
+	problem = $state<'load' | 'save' | 'conflict' | ''>('');
 
 	xp = $derived(totalXp(this.tasks));
 	levelInfo = $derived(levelFromXp(this.xp));
@@ -57,12 +60,13 @@ export class TaskStore {
 	 * user's real list with an empty one.
 	 */
 	#save() {
-		if (!this.loaded) return;
+		// After a conflict nothing is sent until the user reloads, or it would only fail again.
+		if (!this.loaded || this.problem === 'conflict') return;
 		const saving = this.#storage.save(this.tasks);
 		if (saving instanceof Promise) {
 			saving.then(
 				() => (this.problem = this.problem === 'save' ? '' : this.problem),
-				() => (this.problem = 'save')
+				(e) => (this.problem = e instanceof ConflictError ? 'conflict' : 'save')
 			);
 		}
 	}
@@ -72,7 +76,7 @@ export class TaskStore {
 	 * Returns how many were added. If saving fails the list is restored and the error is thrown.
 	 */
 	async importTasks(incoming: Task[]): Promise<number> {
-		if (!this.loaded) return 0;
+		if (!this.loaded || this.problem === 'conflict') return 0;
 		const known = this.tasks.map((t) => t.id);
 		const fresh = incoming.filter((t) => !known.includes(t.id));
 		if (fresh.length === 0) return 0;

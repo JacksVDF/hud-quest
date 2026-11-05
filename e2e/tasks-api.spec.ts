@@ -27,7 +27,15 @@ const task = (id: string, title: string) => ({
 	notes: ''
 });
 
-const put = (api: APIRequestContext, data: unknown) => api.put('/api/tasks', { data });
+/** The version (ETag) the server currently has for this user. */
+async function versionOf(api: APIRequestContext) {
+	return (await api.get('/api/tasks')).headers()['etag'];
+}
+
+/** Saves on top of the current version, like a tab that has just loaded. */
+async function put(api: APIRequestContext, data: unknown) {
+	return api.put('/api/tasks', { data, headers: { 'if-match': await versionOf(api) } });
+}
 
 test('requires a session', async ({ playwright, baseURL }) => {
 	const api = await playwright.request.newContext({ baseURL });
@@ -74,7 +82,7 @@ test('rejects bad input', async ({ browser }) => {
 		(
 			await user.api.put('/api/tasks', {
 				data: 'not json{',
-				headers: { 'content-type': 'application/json' }
+				headers: { 'content-type': 'application/json', 'if-match': '"0"' }
 			})
 		).status()
 	).toBe(400);
@@ -82,7 +90,7 @@ test('rejects bad input', async ({ browser }) => {
 		(
 			await user.api.put('/api/tasks', {
 				data: '[]',
-				headers: { 'content-type': 'application/xml' }
+				headers: { 'content-type': 'application/xml', 'if-match': '"0"' }
 			})
 		).status()
 	).toBe(415);
@@ -92,9 +100,50 @@ test('rejects bad input', async ({ browser }) => {
 		(
 			await user.api.put('/api/tasks', {
 				data: [],
-				headers: { origin: 'https://evil.example' }
+				headers: { origin: 'https://evil.example', 'if-match': '"0"' }
 			})
 		).status()
 	).toBe(403);
+	await user.close();
+});
+
+test('refuses to overwrite a list that changed since it was read', async ({ browser }) => {
+	const user = await newUser(browser);
+	const first = await versionOf(user.api);
+	expect(first).toBe('"0"');
+
+	// Tab A saves on top of version 0.
+	const a = await user.api.put('/api/tasks', {
+		data: [task('a', 'From A')],
+		headers: { 'if-match': first }
+	});
+	expect(a.status()).toBe(200);
+	expect(a.headers()['etag']).toBe('"1"');
+
+	// Tab B still thinks it is at version 0: refused, and A's data survives.
+	const b = await user.api.put('/api/tasks', {
+		data: [task('b', 'From B')],
+		headers: { 'if-match': first }
+	});
+	expect(b.status()).toBe(412);
+	const current = await (await user.api.get('/api/tasks')).json();
+	expect(current.map((t: { title: string }) => t.title)).toEqual(['From A']);
+
+	// Reloading gives the new version, and saving works again.
+	const c = await user.api.put('/api/tasks', {
+		data: [task('a', 'From A'), task('b', 'From B')],
+		headers: { 'if-match': await versionOf(user.api) }
+	});
+	expect(c.status()).toBe(200);
+	expect(c.headers()['etag']).toBe('"2"');
+	await user.close();
+});
+
+test('requires a version to save', async ({ browser }) => {
+	const user = await newUser(browser);
+	expect((await user.api.put('/api/tasks', { data: [] })).status()).toBe(428);
+	expect(
+		(await user.api.put('/api/tasks', { data: [], headers: { 'if-match': 'abc' } })).status()
+	).toBe(400);
 	await user.close();
 });

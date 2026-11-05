@@ -162,3 +162,44 @@ test('keeps guest tasks in the browser when the import is skipped', async ({ pag
 	await page.getByRole('button', { name: 'LOGOUT' }).click();
 	await expect(page.getByText('Keep me')).toBeVisible();
 });
+
+test('a second tab that saved first makes the first tab stop and offer a reload', async ({
+	browser
+}) => {
+	const context = await browser.newContext({
+		extraHTTPHeaders: { 'cf-connecting-ip': `10.${Math.floor(Math.random() * 250) + 1}.7.7` }
+	});
+	const tabA = await context.newPage();
+	await signUp(tabA, uniqueEmail());
+
+	const tabB = await context.newPage();
+	await tabB.goto('/');
+	await expect(tabB.getByTestId('account-email')).toBeVisible();
+	await expect(tabB.getByText('loading…')).toHaveCount(0);
+
+	// Tab B saves first.
+	await tabB.getByLabel('NEW_TASK_').fill('From B');
+	await tabB.getByRole('button', { name: /^ADD >/ }).click();
+	await expect(tabB.getByText('From B')).toBeVisible();
+	await expect
+		.poll(async () => (await (await tabB.request.get('/api/tasks')).json()).length)
+		.toBe(1);
+
+	// Tab A still has version 0: its save is refused and nothing of B is lost.
+	await tabA.getByLabel('NEW_TASK_').fill('From A');
+	await tabA.getByRole('button', { name: /^ADD >/ }).click();
+	await expect(tabA.getByRole('alert')).toContainText('changed in another tab');
+
+	await tabA.getByRole('button', { name: /RELOAD TASKS/ }).click();
+	await expect(tabA.getByText('From B')).toBeVisible();
+	await expect(tabA.getByText('From A')).toHaveCount(0);
+	await expect(tabA.getByRole('alert')).toHaveCount(0);
+
+	// And it can save again.
+	await tabA.getByLabel('NEW_TASK_').fill('From A again');
+	await tabA.getByRole('button', { name: /^ADD >/ }).click();
+	await expect
+		.poll(async () => (await (await tabA.request.get('/api/tasks')).json()).length)
+		.toBe(2);
+	await context.close();
+});

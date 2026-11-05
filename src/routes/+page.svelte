@@ -177,7 +177,16 @@
 			</div>
 		{/if}
 
-		{#if taskStore.problem === 'save'}
+		{#if taskStore.problem === 'conflict'}
+			<div class="flex flex-col gap-3 border-2 border-f p-3 text-sm" role="alert">
+				<p>[!] Your tasks were changed in another tab or device. Your last change was not saved.</p>
+				<div>
+					<button type="button" class="btn g sm" onclick={() => taskStore.load()}>
+						RELOAD TASKS &gt;
+					</button>
+				</div>
+			</div>
+		{:else if taskStore.problem === 'save'}
 			<p class="border-2 border-f p-3 text-sm" role="alert">
 				[!] Your last change could not be saved. Check your connection and try again.
 			</p>
