@@ -1,0 +1,37 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - run: npm run check
+      - run: npm run lint
+      - run: npm test
+
+      # The e2e tests run the built Worker with `wrangler dev` (local D1), which needs the auth
+      # secret. A throwaway value is generated for this run; nothing real is used in CI.
+      - name: Create a temporary .dev.vars
+        run: echo "BETTER_AUTH_SECRET=$(openssl rand -hex 32)" > .dev.vars
+
+      # ubuntu-latest already ships Google Chrome, which playwright.config.ts uses (channel: 'chrome').
+      - run: npm run test:e2e
+        env:
+          CI: true
