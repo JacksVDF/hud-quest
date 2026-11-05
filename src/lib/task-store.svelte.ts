@@ -1,13 +1,5 @@
-import {
-	MAX_NOTES_LENGTH,
-	STORAGE_KEY,
-	addTag,
-	canMarkDone,
-	parseTasks,
-	reconcileDone,
-	totalXp,
-	type Task
-} from './tasks';
+import { createLocalStorage, type TaskStorage } from './storage';
+import { MAX_NOTES_LENGTH, addTag, canMarkDone, reconcileDone, totalXp, type Task } from './tasks';
 import { levelFromXp } from './xp';
 import type { Complexity } from './xp';
 
@@ -26,14 +18,20 @@ export class TaskStore {
 	xp = $derived(totalXp(this.tasks));
 	levelInfo = $derived(levelFromXp(this.xp));
 
-	/** Read from localStorage. Call once on the client (e.g. in onMount). */
+	#storage: TaskStorage;
+
+	constructor(storage: TaskStorage = createLocalStorage()) {
+		this.#storage = storage;
+	}
+
+	/** Read from the storage. Call once on the client (e.g. in onMount). */
 	load() {
-		this.tasks = parseTasks(localStorage.getItem(STORAGE_KEY));
+		this.tasks = this.#storage.load();
 		this.loaded = true;
 	}
 
 	#save() {
-		localStorage.setItem(STORAGE_KEY, JSON.stringify(this.tasks));
+		this.#storage.save(this.tasks);
 	}
 
 	/** Runs a mutation, saves, and reports the XP and level difference. */

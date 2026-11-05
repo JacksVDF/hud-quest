@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { STORAGE_KEY } from './tasks';
+import { STORAGE_KEY, type Task } from './tasks';
 import { TaskStore } from './task-store.svelte';
 
 function stubStorage(initial: Record<string, string> = {}) {
@@ -58,6 +58,30 @@ describe('TaskStore basics', () => {
 	it('survives corrupted storage', () => {
 		const { store } = fresh({ [STORAGE_KEY]: '{not json' });
 		expect(store.tasks).toEqual([]);
+	});
+});
+
+describe('TaskStore with a custom storage', () => {
+	it('loads from and saves to the injected storage, not localStorage', () => {
+		const saved: Task[][] = [];
+		const seed: Task = {
+			id: 's1',
+			title: 'seeded',
+			complexity: 'easy',
+			done: false,
+			tags: [],
+			items: [],
+			notes: ''
+		};
+		const store = new TaskStore({
+			load: () => [seed],
+			save: (t) => void saved.push(structuredClone(t))
+		});
+		store.load();
+		expect(store.tasks.map((t) => t.title)).toEqual(['seeded']);
+		store.toggle('s1');
+		expect(saved).toHaveLength(1);
+		expect(saved[0][0].done).toBe(true);
 	});
 });
 
