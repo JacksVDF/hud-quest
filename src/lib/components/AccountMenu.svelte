@@ -1,11 +1,8 @@
 <script lang="ts">
-	import { onMount } from 'svelte';
 	import { resolve } from '$app/paths';
 	import { session } from '#lib/session.svelte.ts';
 
-	onMount(() => {
-		void session.refresh();
-	});
+	let { onsignout }: { onsignout: () => void } = $props();
 </script>
 
 <!-- Hidden until the session is known, so signed-in users never see a flash of LOGIN. -->
@@ -19,7 +16,7 @@
 			>
 				{session.email}
 			</span>
-			<button type="button" class="btn o sm" onclick={() => session.signOut()}>LOGOUT</button>
+			<button type="button" class="btn o sm" onclick={onsignout}>LOGOUT</button>
 		</div>
 	{:else}
 		<a class="btn o sm" href={resolve('/login')}>LOGIN</a>

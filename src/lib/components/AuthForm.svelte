@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { onMount } from 'svelte';
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import { authClient } from '#lib/auth-client.ts';
@@ -13,6 +14,9 @@
 	let password = $state('');
 	let error = $state('');
 	let busy = $state(false);
+	// Until the page is interactive a submit would be a plain browser form post.
+	let ready = $state(false);
+	onMount(() => (ready = true));
 
 	const isSignup = $derived(mode === 'signup');
 
@@ -46,7 +50,8 @@
 	}
 </script>
 
-<form class="flex max-w-md flex-col gap-4" onsubmit={submit}>
+<!-- method="post" so credentials can never end up in the URL if the script fails to load. -->
+<form class="flex max-w-md flex-col gap-4" method="post" onsubmit={submit}>
 	<label class="text-xs">
 		EMAIL_
 		<input
@@ -83,7 +88,7 @@
 	</div>
 
 	<div class="flex flex-wrap items-center gap-4">
-		<button type="submit" class="btn g" disabled={busy}>
+		<button type="submit" class="btn g" disabled={busy || !ready}>
 			{busy ? 'WAIT…' : isSignup ? 'CREATE ACCOUNT >' : 'LOGIN >'}
 		</button>
 		{#if isSignup}

@@ -14,24 +14,57 @@ export interface Change {
 export class TaskStore {
 	tasks = $state<Task[]>([]);
 	loaded = $state(false);
+	/** Set when the account storage failed; cleared by the next successful load or save. */
+	problem = $state<'load' | 'save' | ''>('');
 
 	xp = $derived(totalXp(this.tasks));
 	levelInfo = $derived(levelFromXp(this.xp));
 
 	#storage: TaskStorage;
+	/** Bumped on every load so a slow, outdated load cannot overwrite a newer one. */
+	#generation = 0;
 
 	constructor(storage: TaskStorage = createLocalStorage()) {
 		this.#storage = storage;
 	}
 
 	/** Read from the storage. Call once on the client (e.g. in onMount). */
-	load() {
-		this.tasks = this.#storage.load();
-		this.loaded = true;
+	load(): void | Promise<void> {
+		const generation = ++this.#generation;
+		this.loaded = false;
+		this.problem = '';
+		const apply = (tasks: Task[]) => {
+			if (generation !== this.#generation) return;
+			this.tasks = tasks;
+			this.loaded = true;
+		};
+		const loading = this.#storage.load();
+		if (!(loading instanceof Promise)) return apply(loading);
+		return loading.then(apply, () => {
+			if (generation === this.#generation) this.problem = 'load';
+		});
 	}
 
+	/** Switches to another storage (guest <-> account) and loads from it. */
+	useStorage(storage: TaskStorage) {
+		this.#storage = storage;
+		this.tasks = [];
+		return this.load();
+	}
+
+	/**
+	 * Never saves before a successful load: with account storage that would replace the
+	 * user's real list with an empty one.
+	 */
 	#save() {
-		this.#storage.save(this.tasks);
+		if (!this.loaded) return;
+		const saving = this.#storage.save(this.tasks);
+		if (saving instanceof Promise) {
+			saving.then(
+				() => (this.problem = this.problem === 'save' ? '' : this.problem),
+				() => (this.problem = 'save')
+			);
+		}
 	}
 
 	/** Runs a mutation, saves, and reports the XP and level difference. */
@@ -49,7 +82,7 @@ export class TaskStore {
 
 	add(title: string, complexity: Complexity, tags: string[] = []) {
 		const clean = title.trim();
-		if (!clean) return;
+		if (!clean || !this.loaded) return;
 		this.tasks.push({
 			id: crypto.randomUUID(),
 			title: clean,

@@ -9,6 +9,8 @@
 	import TaskItem from '#lib/components/TaskItem.svelte';
 	import ThemeToggle from '#lib/components/ThemeToggle.svelte';
 	import { ms } from '#lib/motion.ts';
+	import { session } from '#lib/session.svelte.ts';
+	import { createLocalStorage, createRemoteStorage } from '#lib/storage.ts';
 	import { clampPage, pageCount, paginate } from '#lib/pagination.ts';
 	import { taskStore, type Change } from '#lib/task-store.svelte.ts';
 	import { allTags, filterTasks, type StatusFilter } from '#lib/tasks.ts';
@@ -19,7 +21,16 @@
 	let status = $state<StatusFilter>('all');
 	let requestedPage = $state(1);
 
-	onMount(() => taskStore.load());
+	// Who is signed in decides where the tasks live, so the session is resolved first.
+	onMount(async () => {
+		await session.refresh();
+		await taskStore.useStorage(session.email ? createRemoteStorage() : createLocalStorage());
+	});
+
+	async function signOut() {
+		await session.signOut();
+		await taskStore.useStorage(createLocalStorage());
+	}
 
 	/** Turns an XP change into a feedback message; clears it when nothing changed. */
 	function announce(change: Change | null, up: string, down: string) {
@@ -82,7 +93,7 @@
 	<header class="flex items-center justify-between gap-4 py-5">
 		<div class="h text-lg tracking-widest sm:text-xl">X HUD//QUEST</div>
 		<div class="flex items-center gap-3">
-			<AccountMenu />
+			<AccountMenu onsignout={signOut} />
 			<ThemeToggle />
 		</div>
 	</header>
@@ -122,12 +133,22 @@
 			{/key}
 		</div>
 
+		{#if taskStore.problem === 'save'}
+			<p class="border-2 border-f p-3 text-sm" role="alert">
+				[!] Your last change could not be saved. Check your connection and try again.
+			</p>
+		{/if}
+
 		<section aria-labelledby="list-title" class="flex flex-col gap-4">
 			<h2 id="list-title" class="h text-2xl">
 				_MISSIONS; <span class="text-sm font-normal">{doneCount}/{taskStore.tasks.length}</span>
 			</h2>
 
-			{#if !taskStore.loaded}
+			{#if taskStore.problem === 'load'}
+				<p class="border-2 border-f p-3 text-sm" role="alert">
+					[!] Could not load your tasks. Reload the page to try again.
+				</p>
+			{:else if !taskStore.loaded}
 				<p class="text-sm">&gt; loading…</p>
 			{:else if taskStore.tasks.length === 0}
 				<p class="text-sm">&gt; No tasks yet. Add one above to start earning XP.</p>

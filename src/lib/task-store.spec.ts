@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { createRemoteStorage } from './storage';
 import { STORAGE_KEY, type Task } from './tasks';
 import { TaskStore } from './task-store.svelte';
 
@@ -215,5 +216,118 @@ describe('TaskStore update', () => {
 		store.add('keep', 'easy');
 		store.update(store.tasks[0].id, { title: '   ' });
 		expect(store.tasks[0].title).toBe('keep');
+	});
+});
+
+const seed = (id: string): Task => ({
+	id,
+	title: id,
+	complexity: 'easy',
+	done: false,
+	tags: [],
+	items: [],
+	notes: ''
+});
+
+describe('TaskStore with async storage', () => {
+	it('is not loaded until the storage answers, and ignores adds before that', async () => {
+		let answer!: (tasks: Task[]) => void;
+		const saves: Task[][] = [];
+		const store = new TaskStore({
+			load: () => new Promise<Task[]>((resolve) => (answer = resolve)),
+			save: (t) => void saves.push(t)
+		});
+		const loading = store.load();
+		expect(store.loaded).toBe(false);
+		store.add('too early', 'easy');
+		expect(store.tasks).toEqual([]);
+		expect(saves).toEqual([]);
+		answer([seed('a')]);
+		await loading;
+		expect(store.loaded).toBe(true);
+		expect(store.tasks.map((t) => t.id)).toEqual(['a']);
+	});
+
+	it('reports a load problem and never saves over the account list', async () => {
+		const saves: Task[][] = [];
+		const store = new TaskStore({
+			load: () => Promise.reject(new Error('offline')),
+			save: (t) => void saves.push(t)
+		});
+		await store.load();
+		expect(store.problem).toBe('load');
+		expect(store.loaded).toBe(false);
+		store.add('lost', 'easy');
+		expect(saves).toEqual([]);
+	});
+
+	it('reports a save problem and clears it after a successful save', async () => {
+		let fail = true;
+		const store = new TaskStore({
+			load: () => [],
+			save: () => (fail ? Promise.reject(new Error('offline')) : Promise.resolve())
+		});
+		store.load();
+		store.add('a', 'easy');
+		await new Promise((r) => setTimeout(r));
+		expect(store.problem).toBe('save');
+		fail = false;
+		store.add('b', 'easy');
+		await new Promise((r) => setTimeout(r));
+		expect(store.problem).toBe('');
+	});
+
+	it('a slow older load cannot overwrite a newer one', async () => {
+		const resolvers: Array<(t: Task[]) => void> = [];
+		const store = new TaskStore({
+			load: () => new Promise<Task[]>((resolve) => resolvers.push(resolve)),
+			save: () => {}
+		});
+		const first = store.load();
+		const second = store.useStorage({
+			load: () => [seed('new')],
+			save: () => {}
+		});
+		resolvers[0]([seed('old')]);
+		await first;
+		await second;
+		expect(store.tasks.map((t) => t.id)).toEqual(['new']);
+	});
+});
+
+describe('createRemoteStorage', () => {
+	const ok = (body: unknown = {}) => new Response(JSON.stringify(body), { status: 200 });
+
+	it('loads and validates the tasks from the API', async () => {
+		const fetcher = vi.fn(async () => ok([seed('a'), { id: 5 }]));
+		const tasks = await createRemoteStorage(fetcher as unknown as typeof fetch).load();
+		expect(tasks.map((t) => t.id)).toEqual(['a']);
+	});
+
+	it('rejects when the API fails', async () => {
+		const fetcher = vi.fn(async () => new Response('no', { status: 401 }));
+		const storage = createRemoteStorage(fetcher as unknown as typeof fetch);
+		await expect(storage.load()).rejects.toThrow();
+		await expect(storage.save([])).rejects.toThrow();
+	});
+
+	it('sends saves one at a time, in order', async () => {
+		const order: string[] = [];
+		let releaseFirst!: () => void;
+		const fetcher = vi.fn(async (_url: string, init?: RequestInit) => {
+			const label = (JSON.parse(init!.body as string) as Task[])[0].id;
+			order.push(`start ${label}`);
+			if (label === 'one') await new Promise<void>((r) => (releaseFirst = r));
+			order.push(`end ${label}`);
+			return ok();
+		});
+		const storage = createRemoteStorage(fetcher as unknown as typeof fetch);
+		const a = storage.save([seed('one')]);
+		const b = storage.save([seed('two')]);
+		await Promise.resolve();
+		await Promise.resolve();
+		releaseFirst();
+		await Promise.all([a, b]);
+		expect(order).toEqual(['start one', 'end one', 'start two', 'end two']);
 	});
 });

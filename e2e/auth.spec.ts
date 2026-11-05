@@ -77,10 +77,47 @@ test('rejects an email that is already registered', async ({ page }) => {
 	await expect(page.getByRole('alert')).toHaveText(/already registered/);
 });
 
-test('guest tasks are still kept after logging in (no sync yet)', async ({ page }) => {
+test('an account has its own task list, and guest tasks come back after logout', async ({
+	page
+}) => {
 	await page.goto('/');
+	await expect(page.getByText('loading…')).toHaveCount(0);
 	await page.getByLabel('NEW_TASK_').fill('Guest task');
 	await page.getByRole('button', { name: /^ADD >/ }).click();
-	await signUp(page, uniqueEmail());
 	await expect(page.getByText('Guest task')).toBeVisible();
+
+	await signUp(page, uniqueEmail());
+	await expect(page.getByText('No tasks yet')).toBeVisible();
+	await expect(page.getByText('Guest task')).toHaveCount(0);
+
+	await page.getByLabel('NEW_TASK_').fill('Account task');
+	await page.getByRole('button', { name: /^ADD >/ }).click();
+	await expect(page.getByText('Account task')).toBeVisible();
+	await page.reload();
+	await expect(page.getByText('Account task')).toBeVisible();
+
+	await page.getByRole('button', { name: 'LOGOUT' }).click();
+	await expect(page.getByText('Guest task')).toBeVisible();
+	await expect(page.getByText('Account task')).toHaveCount(0);
+});
+
+test('account tasks follow the user to another browser session', async ({ page, browser }) => {
+	const email = uniqueEmail();
+	await signUp(page, email);
+	await page.getByLabel('NEW_TASK_').fill('Everywhere');
+	await page.getByRole('button', { name: /^ADD >/ }).click();
+	await expect(page.getByText('Everywhere')).toBeVisible();
+	// Saving is asynchronous: wait until the server has it before opening the second session.
+	await expect
+		.poll(async () => (await (await page.request.get('/api/tasks')).json()).length)
+		.toBe(1);
+
+	const other = await browser.newContext({
+		extraHTTPHeaders: { 'cf-connecting-ip': '10.99.99.99' }
+	});
+	const page2 = await other.newPage();
+	await page2.goto('/login');
+	await fillAndSubmit(page2, email, PASSWORD, /LOGIN >/);
+	await expect(page2.getByText('Everywhere')).toBeVisible();
+	await other.close();
 });
