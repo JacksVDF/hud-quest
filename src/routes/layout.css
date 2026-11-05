@@ -1,0 +1,200 @@
+@import 'tailwindcss';
+@import '@fontsource/chakra-petch/700.css';
+@import '@fontsource/space-mono/400.css';
+@import '@fontsource/space-mono/700.css';
+
+/* Theme tokens from the HUD Quest design: --f = foreground, --b = background */
+:root,
+:root[data-theme='light'] {
+	--f: #000;
+	--b: #fff;
+	--hud-gradient: linear-gradient(90deg, #ff7a9c, #4de8ff, #b66cff);
+}
+:root[data-theme='dark'] {
+	--f: #fff;
+	--b: #000;
+}
+
+@theme inline {
+	--color-f: var(--f);
+	--color-b: var(--b);
+	--color-hud-pink: #ff7a9c;
+}
+
+@layer base {
+	body {
+		overflow-x: clip;
+		background: var(--b);
+		color: var(--f);
+		font-family: 'Space Mono', monospace;
+		font-size: 14px;
+	}
+	button,
+	input,
+	select,
+	textarea {
+		font-family: 'Space Mono', monospace;
+	}
+	:focus-visible {
+		outline: 3px solid var(--color-hud-pink);
+		outline-offset: 3px;
+	}
+}
+
+@layer components {
+	/* Corner brackets, 12px arms, 2px thick */
+	.brk {
+		background:
+			linear-gradient(var(--f), var(--f)) top left / 12px 2px no-repeat,
+			linear-gradient(var(--f), var(--f)) top left / 2px 12px no-repeat,
+			linear-gradient(var(--f), var(--f)) top right / 12px 2px no-repeat,
+			linear-gradient(var(--f), var(--f)) top right / 2px 12px no-repeat,
+			linear-gradient(var(--f), var(--f)) bottom left / 12px 2px no-repeat,
+			linear-gradient(var(--f), var(--f)) bottom left / 2px 12px no-repeat,
+			linear-gradient(var(--f), var(--f)) bottom right / 12px 2px no-repeat,
+			linear-gradient(var(--f), var(--f)) bottom right / 2px 12px no-repeat;
+	}
+	.gl {
+		background: var(--hud-gradient);
+	}
+	.h {
+		font-family: 'Chakra Petch', sans-serif;
+		font-weight: 700;
+	}
+
+	.btn {
+		display: inline-flex;
+		align-items: center;
+		min-height: 44px;
+		padding: 0 20px;
+		border: 2px solid var(--f);
+		background: var(--f);
+		color: var(--b);
+		font:
+			700 14px 'Space Mono',
+			monospace;
+		cursor: pointer;
+		transition:
+			transform 0.12s,
+			box-shadow 0.12s;
+	}
+	.btn.sm {
+		min-height: 36px;
+		padding: 0 12px;
+		font-size: 12px;
+	}
+	.btn.o {
+		background: transparent;
+		color: var(--f);
+	}
+	.btn.g {
+		background:
+			var(--hud-gradient) bottom / 100% 4px no-repeat,
+			var(--f);
+		padding-bottom: 4px;
+	}
+	.btn:hover:not(:disabled) {
+		transform: translate(-2px, -2px);
+		box-shadow: 3px 3px 0 var(--f);
+	}
+	.btn:active:not(:disabled) {
+		transform: none;
+		box-shadow: none;
+	}
+	.btn:disabled {
+		opacity: 0.4;
+		cursor: not-allowed;
+		background: repeating-linear-gradient(135deg, transparent 0 4px, var(--f) 4px 5px);
+		color: var(--f);
+	}
+
+	.inp {
+		width: 100%;
+		min-height: 44px;
+		padding: 0 12px;
+		border: 2px solid var(--f);
+		background: transparent;
+		color: var(--f);
+		font:
+			14px 'Space Mono',
+			monospace;
+	}
+	.inp.sm {
+		min-height: 36px;
+		font-size: 13px;
+	}
+	.inp::placeholder {
+		color: var(--f);
+		opacity: 0.5;
+	}
+
+	/* Tactile press + smooth state change for the [ ] / [X] checkboxes */
+	.chk {
+		cursor: pointer;
+		transition:
+			transform 0.1s,
+			opacity 0.2s;
+	}
+	.chk:active:not(:disabled) {
+		transform: scale(0.88);
+	}
+
+	.tag {
+		font-size: 12px;
+		border: 2px solid var(--f);
+		padding: 4px 10px;
+		transition:
+			background-color 0.15s,
+			color 0.15s;
+	}
+	.tag.s {
+		background: var(--f);
+		color: var(--b);
+	}
+}
+
+/* Level-up banner accent: the design's gradient as an underline */
+.gline {
+	background-image: var(--hud-gradient);
+	background-size: 100% 4px;
+	background-position: bottom;
+	background-repeat: no-repeat;
+}
+
+/* Gradient line draws in from the left on load */
+@keyframes grow {
+	from {
+		transform: scaleX(0);
+	}
+}
+.grow {
+	transform-origin: left;
+	animation: grow 0.7s ease-out;
+}
+
+/* Numbers pop when they change */
+@keyframes pop {
+	0% {
+		transform: scale(1.5);
+		opacity: 0.3;
+	}
+	100% {
+		transform: scale(1);
+		opacity: 1;
+	}
+}
+.pop {
+	display: inline-block;
+	transform-origin: left bottom;
+	animation: pop 0.35s cubic-bezier(0.2, 0.8, 0.3, 1.2);
+}
+
+@media (prefers-reduced-motion: reduce) {
+	*,
+	::before,
+	::after {
+		animation-duration: 0.01ms !important;
+		animation-iteration-count: 1 !important;
+		transition-duration: 0.01ms !important;
+	}
+}
