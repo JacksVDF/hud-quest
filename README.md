@@ -55,7 +55,14 @@ npm run test:e2e   # browser tests (Playwright, builds the app and uses installe
 - With an account (email + password, at least 10 characters), tasks are kept in Cloudflare D1 and follow you across browsers. There is no email verification and no password recovery yet.
 - After the first login the app offers to import the guest tasks of that browser into the account (nothing is imported without asking; tasks already in the account are not duplicated).
 - Login endpoints are rate limited per IP. Passwords are hashed by Better Auth (scrypt). Every task query is filtered by the signed-in user's id (`src/lib/server/db.ts`), and the API accepts at most 500 tasks and 512 KB per save.
+- Every save says which version of the list it is based on (`If-Match` / `ETag`). If another tab or device saved first, the server answers 412, nothing is overwritten, and the app asks you to reload your tasks.
+- The account page (`/account`, click your email in the header) can delete the account and all its data. The password is always required.
 - The theme is always saved in the browser.
+
+## Known limits
+
+- No email verification and no password recovery yet (they need an email sender and a domain). A forgotten password means a lost account.
+- `npm audit` reports 15 low/moderate issues, all in dev tooling (eslint, minimatch) or a prototype-pollution advisory in `deepmerge`, which is used by the build tool only. The only fixes npm offers are major downgrades, so they are not applied. Re-check after dependency updates.
 
 ## Project layout
 
@@ -70,7 +77,7 @@ src/lib/session.svelte.ts  who is signed in, as seen by the browser
 src/lib/server/auth.ts     Better Auth config (D1, rate limits)
 src/lib/server/db.ts       the only code that reads/writes a user's tasks
 src/routes/api/tasks/      GET/PUT the signed-in user's tasks
-src/routes/login, signup/  auth pages
+src/routes/login, signup, account/  auth and account pages
 migrations/                D1 schema (apply with the db:migrate:* scripts)
 .github/workflows/ci.yml   check, lint, unit and e2e tests on every push
 src/lib/motion.ts          transition durations (0 with reduced motion)
