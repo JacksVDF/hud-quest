@@ -9,7 +9,8 @@
 	import TaskForm from '#lib/components/TaskForm.svelte';
 	import TaskItem from '#lib/components/TaskItem.svelte';
 	import Trash from '#lib/components/Trash.svelte';
-	import { ms } from '#lib/motion.ts';
+	import { slide } from 'svelte/transition';
+	import { MOTION, dismiss, ms } from '#lib/motion.ts';
 	import { session } from '#lib/session.svelte.ts';
 	import {
 		clearGuestTasks,
@@ -211,21 +212,26 @@
 				{:else}
 					<ul class="flex scroll-mt-28 flex-col gap-4" bind:this={listEl}>
 						{#each pageTasks as task (task.id)}
-							<TaskItem
-								{task}
-								ontoggle={toggle}
-								onsave={(id, patch) => taskStore.update(id, patch)}
-								onremove={(id) =>
-									announce(taskStore.remove(id), 'Task moved to trash', 'Task moved to trash')}
-								onadditem={(id, title) =>
-									announce(taskStore.addItem(id, title), 'XP updated', 'XP updated')}
-								ontoggleitem={(id, itemId) => {
-									const l = labelsFor(id);
-									announce(taskStore.toggleItem(id, itemId), l.up, l.down);
-								}}
-								onremoveitem={(id, itemId) =>
-									announce(taskStore.removeItem(id, itemId), 'XP updated', 'XP updated')}
-							/>
+							<li
+								in:slide={{ duration: ms(MOTION.enter) }}
+								out:dismiss|global={{ duration: ms(MOTION.exit), x: MOTION.travel }}
+							>
+								<TaskItem
+									{task}
+									ontoggle={toggle}
+									onsave={(id, patch) => taskStore.update(id, patch)}
+									onremove={(id) =>
+										announce(taskStore.remove(id), 'Task moved to trash', 'Task moved to trash')}
+									onadditem={(id, title) =>
+										announce(taskStore.addItem(id, title), 'XP updated', 'XP updated')}
+									ontoggleitem={(id, itemId) => {
+										const l = labelsFor(id);
+										announce(taskStore.toggleItem(id, itemId), l.up, l.down);
+									}}
+									onremoveitem={(id, itemId) =>
+										announce(taskStore.removeItem(id, itemId), 'XP updated', 'XP updated')}
+								/>
+							</li>
 						{/each}
 					</ul>
 					<Pagination bind:page={() => page, goToPage} count={pageCount(visible.length)} />

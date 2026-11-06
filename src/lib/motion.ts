@@ -20,3 +20,16 @@ export function dismiss(
 			`${collapse.css?.(t, u) ?? ''}; transform: translateX(${u * x}px); opacity: ${t};`
 	};
 }
+
+/**
+ * Timings shared by every animated element of the same kind, so similar things always move
+ * the same way. Change a value here and all of them follow.
+ */
+export const MOTION = {
+	/** A row or panel growing into place. */
+	enter: 220,
+	/** A row flying out (delete, restore). */
+	exit: 320,
+	/** Horizontal travel of a row that flies out, in px. */
+	travel: 48
+} as const;

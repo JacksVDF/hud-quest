@@ -1,7 +1,6 @@
 <script lang="ts">
-	import { flip } from 'svelte/animate';
 	import { slide } from 'svelte/transition';
-	import { dismiss, ms } from '#lib/motion.ts';
+	import { MOTION, dismiss, ms } from '#lib/motion.ts';
 	import { TRASH_DAYS, daysLeftInTrash, type Task } from '#lib/tasks.ts';
 
 	let {
@@ -34,7 +33,7 @@
 		aria-labelledby="trash-title"
 		class="flex flex-col gap-4"
 		data-testid="trash"
-		transition:slide={{ duration: ms(220) }}
+		transition:slide={{ duration: ms(MOTION.enter) }}
 	>
 		<h2 id="trash-title" class="h text-2xl">
 			<button
@@ -55,7 +54,11 @@
 		</h2>
 
 		{#if open}
-			<div id="trash-list" class="flex flex-col gap-4" transition:slide={{ duration: ms(220) }}>
+			<div
+				id="trash-list"
+				class="flex flex-col gap-4"
+				transition:slide={{ duration: ms(MOTION.enter) }}
+			>
 				<p class="text-xs">
 					&gt; Deleted tasks stay here for {TRASH_DAYS} days and give no XP. Restore one to get it back.
 				</p>
@@ -63,12 +66,11 @@
 					{#each tasks as task (task.id)}
 						<li
 							class="flex flex-wrap items-center gap-3 border-2 border-f p-3"
-							in:slide={{ duration: ms(220) }}
+							in:slide={{ duration: ms(MOTION.enter) }}
 							out:dismiss|global={{
-								duration: ms(leaving === 'close' ? 0 : 320),
-								x: leaving === 'restore' ? -48 : 48
+								duration: ms(leaving === 'close' ? 0 : MOTION.exit),
+								x: leaving === 'restore' ? -MOTION.travel : MOTION.travel
 							}}
-							animate:flip={{ duration: ms(220) }}
 						>
 							<span class="min-w-0 flex-1 break-words opacity-75">{task.title}</span>
 							<span class="tag">{daysLeftInTrash(task, now)}d left</span>

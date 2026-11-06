@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { slide } from 'svelte/transition';
-	import { dismiss, ms } from '#lib/motion.ts';
+	import { MOTION, dismiss, ms } from '#lib/motion.ts';
 	import type { Item } from '#lib/tasks.ts';
 
 	let {
@@ -32,8 +32,8 @@
 	{#each items as item (item.id)}
 		<li
 			class="flex items-center gap-2"
-			in:slide={{ duration: ms(180) }}
-			out:dismiss={{ duration: ms(260), x: 32 }}
+			in:slide={{ duration: ms(MOTION.enter) }}
+			out:dismiss|global={{ duration: ms(MOTION.exit), x: MOTION.travel }}
 		>
 			<button
 				type="button"

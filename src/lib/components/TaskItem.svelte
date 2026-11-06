@@ -3,7 +3,7 @@
 	import Checklist from './Checklist.svelte';
 	import ProgressBar from './ProgressBar.svelte';
 	import TagInput from './TagInput.svelte';
-	import { dismiss, ms } from '#lib/motion.ts';
+	import { MOTION, ms } from '#lib/motion.ts';
 	import { MAX_NOTES_LENGTH, canMarkDone, taskXp, type Task } from '#lib/tasks.ts';
 	import { XP_BY_COMPLEXITY } from '#lib/xp.ts';
 
@@ -63,7 +63,7 @@
 	}
 </script>
 
-<li class="brk p-4" in:slide={{ duration: ms(220) }} out:dismiss|global={{ duration: ms(320) }}>
+<div class="brk p-4">
 	{#if editing}
 		<form class="flex flex-col gap-3" onsubmit={save}>
 			<input class="inp" bind:value={draftTitle} maxlength="120" required aria-label="Task title" />
@@ -155,7 +155,7 @@
 				<div
 					id={panelId}
 					class="mt-3 flex flex-col gap-3 border-t-2 border-f pt-3"
-					transition:slide={{ duration: ms(220) }}
+					transition:slide={{ duration: ms(MOTION.enter) }}
 				>
 					{#if isProject && task.items.length > 0}
 						<ProgressBar
@@ -192,4 +192,4 @@
 			{/if}
 		{/if}
 	{/if}
-</li>
+</div>
