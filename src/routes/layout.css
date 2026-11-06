@@ -22,6 +22,10 @@
 }
 
 @layer base {
+	/* The sticky header must not cover what the browser scrolls into view (focus, anchors). */
+	html {
+		scroll-padding-top: 6rem;
+	}
 	body {
 		overflow-x: clip;
 		background: var(--b);

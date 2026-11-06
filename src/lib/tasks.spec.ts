@@ -3,6 +3,8 @@ import {
 	addTag,
 	allTags,
 	canMarkDone,
+	daysLeftInTrash,
+	dropExpired,
 	filterTasks,
 	normalizeTag,
 	parseTasks,
@@ -254,5 +256,37 @@ describe('toTasks (untrusted input)', () => {
 		]);
 		expect(result?.[0]).toMatchObject({ tags: ['a', 'b', 'c'], notes: '' });
 		expect(result?.[1].notes).toHaveLength(1000);
+	});
+});
+
+describe('trash expiry', () => {
+	const DAY = 24 * 60 * 60 * 1000;
+	const now = 100 * DAY;
+
+	it('keeps active tasks and recently trashed ones, drops old ones', () => {
+		const kept = dropExpired(
+			[
+				task({ id: 'active' }),
+				task({ id: 'recent', deletedAt: now - 29 * DAY }),
+				task({ id: 'old', deletedAt: now - 31 * DAY })
+			],
+			now
+		);
+		expect(kept.map((t) => t.id)).toEqual(['active', 'recent']);
+	});
+
+	it('counts the days left, never below 1', () => {
+		expect(daysLeftInTrash(task({ deletedAt: now }), now)).toBe(30);
+		expect(daysLeftInTrash(task({ deletedAt: now - 10 * DAY }), now)).toBe(20);
+		expect(daysLeftInTrash(task({ deletedAt: now - 29.5 * DAY }), now)).toBe(1);
+	});
+
+	it('survives a round trip through toTasks', () => {
+		const result = toTasks([
+			task({ id: 'a', deletedAt: 123 }),
+			{ ...task({ id: 'b' }), deletedAt: 'x' }
+		]);
+		expect(result?.[0].deletedAt).toBe(123);
+		expect(result?.[1].deletedAt).toBeUndefined();
 	});
 });

@@ -420,3 +420,84 @@ describe('TaskStore importTasks', () => {
 		expect(store.tasks.map((t) => t.id)).toEqual(['a']);
 	});
 });
+
+describe('TaskStore trash', () => {
+	it('moves a task to the trash instead of deleting it, and saves it there', () => {
+		const { store, data } = fresh();
+		store.add('keep me', 'easy');
+		const id = store.tasks[0].id;
+		store.remove(id);
+		expect(store.tasks).toHaveLength(0);
+		expect(store.trash.map((t) => t.id)).toEqual([id]);
+		const saved = JSON.parse(data.get(STORAGE_KEY) ?? '[]');
+		expect(saved).toHaveLength(1);
+		expect(typeof saved[0].deletedAt).toBe('number');
+	});
+
+	it('a trashed done task gives no XP, and restoring brings it back', () => {
+		const { store } = fresh();
+		store.add('a', 'medium');
+		const id = store.tasks[0].id;
+		store.toggle(id);
+		expect(store.remove(id).delta).toBe(-25);
+		expect(store.xp).toBe(0);
+		expect(store.restore(id).delta).toBe(25);
+		expect(store.xp).toBe(25);
+		expect(store.tasks.map((t) => t.id)).toEqual([id]);
+		expect(store.trash).toEqual([]);
+	});
+
+	it('trashed tasks cannot be edited, toggled or given items', () => {
+		const { store } = fresh();
+		store.add('a', 'medium');
+		const id = store.tasks[0].id;
+		store.remove(id);
+		expect(store.toggle(id)).toBeNull();
+		expect(store.addItem(id, 'x')).toBeNull();
+		store.update(id, { title: 'changed' });
+		expect(store.trash[0].title).toBe('a');
+	});
+
+	it('shows the most recently deleted task first', () => {
+		const { store } = fresh();
+		store.add('first', 'easy');
+		store.add('second', 'easy');
+		vi.spyOn(Date, 'now').mockReturnValueOnce(1000).mockReturnValueOnce(2000);
+		store.remove(store.tasks[0].id);
+		store.remove(store.tasks[0].id);
+		expect(store.trash.map((t) => t.title)).toEqual(['second', 'first']);
+		vi.restoreAllMocks();
+	});
+
+	it('purge deletes one trashed task for good; active tasks are never purged', () => {
+		const { store, data } = fresh();
+		store.add('a', 'easy');
+		store.add('b', 'easy');
+		const [a, b] = store.tasks.map((t) => t.id);
+		store.remove(a);
+		store.purge(b);
+		expect(store.tasks.map((t) => t.id)).toEqual([b]);
+		store.purge(a);
+		expect(store.trash).toEqual([]);
+		expect(JSON.parse(data.get(STORAGE_KEY) ?? '[]')).toHaveLength(1);
+	});
+
+	it('emptyTrash removes every trashed task and keeps the active ones', () => {
+		const { store } = fresh();
+		for (const t of ['a', 'b', 'c']) store.add(t, 'easy');
+		store.remove(store.tasks[0].id);
+		store.remove(store.tasks[0].id);
+		store.emptyTrash();
+		expect(store.trash).toEqual([]);
+		expect(store.tasks.map((t) => t.title)).toEqual(['c']);
+	});
+
+	it('drops tasks that have been in the trash for more than 30 days when loading', () => {
+		const old = { ...seed('old'), deletedAt: Date.now() - 31 * 24 * 60 * 60 * 1000 };
+		const recent = { ...seed('recent'), deletedAt: Date.now() - 24 * 60 * 60 * 1000 };
+		const store = new TaskStore({ load: () => [old, recent, seed('active')], save: () => {} });
+		store.load();
+		expect(store.trash.map((t) => t.id)).toEqual(['recent']);
+		expect(store.tasks.map((t) => t.id)).toEqual(['active']);
+	});
+});

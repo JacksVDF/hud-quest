@@ -1,5 +1,13 @@
 import { ConflictError, createLocalStorage, type TaskStorage } from './storage';
-import { MAX_NOTES_LENGTH, addTag, canMarkDone, reconcileDone, totalXp, type Task } from './tasks';
+import {
+	MAX_NOTES_LENGTH,
+	addTag,
+	canMarkDone,
+	dropExpired,
+	reconcileDone,
+	totalXp,
+	type Task
+} from './tasks';
 import { levelFromXp } from './xp';
 import type { Complexity } from './xp';
 
@@ -12,7 +20,14 @@ export interface Change {
 }
 
 export class TaskStore {
-	tasks = $state<Task[]>([]);
+	/** Everything that is saved: active tasks and trashed ones. */
+	#all = $state<Task[]>([]);
+	/** Active tasks. Trashed ones do not count for XP, filters or the list. */
+	tasks = $derived(this.#all.filter((t) => t.deletedAt === undefined));
+	/** Tasks waiting in the trash, most recently deleted first. */
+	trash = $derived(
+		this.#all.filter((t) => t.deletedAt !== undefined).sort((a, b) => b.deletedAt! - a.deletedAt!)
+	);
 	loaded = $state(false);
 	/**
 	 * Set when the account storage failed; cleared by the next successful load or save.
@@ -38,7 +53,7 @@ export class TaskStore {
 		this.problem = '';
 		const apply = (tasks: Task[]) => {
 			if (generation !== this.#generation) return;
-			this.tasks = tasks;
+			this.#all = dropExpired(tasks, Date.now());
 			this.loaded = true;
 		};
 		const loading = this.#storage.load();
@@ -51,7 +66,7 @@ export class TaskStore {
 	/** Switches to another storage (guest <-> account) and loads from it. */
 	useStorage(storage: TaskStorage) {
 		this.#storage = storage;
-		this.tasks = [];
+		this.#all = [];
 		return this.load();
 	}
 
@@ -62,7 +77,7 @@ export class TaskStore {
 	#save() {
 		// After a conflict nothing is sent until the user reloads, or it would only fail again.
 		if (!this.loaded || this.problem === 'conflict') return;
-		const saving = this.#storage.save(this.tasks);
+		const saving = this.#storage.save(this.#all);
 		if (saving instanceof Promise) {
 			saving.then(
 				() => (this.problem = this.problem === 'save' ? '' : this.problem),
@@ -77,15 +92,15 @@ export class TaskStore {
 	 */
 	async importTasks(incoming: Task[]): Promise<number> {
 		if (!this.loaded || this.problem === 'conflict') return 0;
-		const known = this.tasks.map((t) => t.id);
+		const known = this.#all.map((t) => t.id);
 		const fresh = incoming.filter((t) => !known.includes(t.id));
 		if (fresh.length === 0) return 0;
-		const before = this.tasks;
-		this.tasks = [...before, ...fresh];
+		const before = this.#all;
+		this.#all = [...before, ...fresh];
 		try {
-			await this.#storage.save(this.tasks);
+			await this.#storage.save(this.#all);
 		} catch (e) {
-			this.tasks = before;
+			this.#all = before;
 			throw e;
 		}
 		return fresh.length;
@@ -100,14 +115,19 @@ export class TaskStore {
 		return { delta: this.xp - xpBefore, levelBefore, levelAfter: this.levelInfo.level };
 	}
 
+	/** An active task; trashed tasks cannot be edited or toggled. */
 	#find(id: string) {
-		return this.tasks.find((t) => t.id === id);
+		return this.#all.find((t) => t.id === id && t.deletedAt === undefined);
+	}
+
+	#findInTrash(id: string) {
+		return this.#all.find((t) => t.id === id && t.deletedAt !== undefined);
 	}
 
 	add(title: string, complexity: Complexity, tags: string[] = []) {
 		const clean = title.trim();
 		if (!clean || !this.loaded) return;
-		this.tasks.push({
+		this.#all.push({
 			id: crypto.randomUUID(),
 			title: clean,
 			complexity,
@@ -169,10 +189,33 @@ export class TaskStore {
 		});
 	}
 
+	/** Moves a task to the trash. Its XP is removed until it is restored. */
 	remove(id: string): Change {
 		return this.#change(() => {
-			this.tasks = this.tasks.filter((t) => t.id !== id);
+			const task = this.#find(id);
+			if (task) task.deletedAt = Date.now();
 		});
+	}
+
+	/** Takes a task out of the trash; its XP comes back. */
+	restore(id: string): Change {
+		return this.#change(() => {
+			const task = this.#findInTrash(id);
+			if (task) delete task.deletedAt;
+		});
+	}
+
+	/** Deletes a trashed task for good. */
+	purge(id: string) {
+		if (!this.#findInTrash(id)) return;
+		this.#all = this.#all.filter((t) => t.id !== id);
+		this.#save();
+	}
+
+	emptyTrash() {
+		if (this.trash.length === 0) return;
+		this.#all = this.#all.filter((t) => t.deletedAt === undefined);
+		this.#save();
 	}
 }
 

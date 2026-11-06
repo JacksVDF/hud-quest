@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { scale } from 'svelte/transition';
 	import { ms } from '#lib/motion.ts';
-	import { MAX_TAGS, MAX_TAG_LENGTH, addTag } from '#lib/tasks.ts';
+	import { MAX_TAGS, MAX_TAG_LENGTH, addTag, normalizeTag } from '#lib/tasks.ts';
 
 	let { tags = $bindable() }: { tags: string[] } = $props();
 
@@ -9,17 +9,29 @@
 	let draft = $state('');
 	const full = $derived(tags.length >= MAX_TAGS);
 
+	/** Shown when a tag was not added because it is already in the list. */
+	let notice = $state('');
+
+	/** Adds one tag; explains why when it is a duplicate. */
+	function add(raw: string) {
+		const tag = normalizeTag(raw);
+		if (tag && tags.includes(tag)) notice = `#${tag} is already added.`;
+		tags = addTag(tags, raw);
+	}
+
 	function commit() {
-		tags = addTag(tags, draft);
+		add(draft);
 		draft = '';
 	}
 
 	/** A comma (typed or pasted) ends the current tag. */
 	function oninput() {
+		// Typing again means the user has seen the message.
+		notice = '';
 		if (!draft.includes(',')) return;
 		const parts = draft.split(',');
 		const rest = parts.pop() ?? '';
-		for (const part of parts) tags = addTag(tags, part);
+		for (const part of parts) add(part);
 		draft = rest;
 	}
 
@@ -50,6 +62,9 @@
 		placeholder={full ? `max ${MAX_TAGS} tags` : 'type a tag + Enter'}
 		autocomplete="off"
 	/>
+	<p class="mt-2 min-h-5" role="status">
+		{#if notice}[!] {notice}{/if}
+	</p>
 	<ul class="mt-2 flex flex-wrap gap-2 empty:hidden">
 		{#each tags as tag (tag)}
 			<li
@@ -61,7 +76,10 @@
 					type="button"
 					class="min-h-10 min-w-10 cursor-pointer font-bold"
 					aria-label="Remove tag {tag}"
-					onclick={() => (tags = tags.filter((t) => t !== tag))}
+					onclick={() => {
+						tags = tags.filter((t) => t !== tag);
+						notice = '';
+					}}
 				>
 					X
 				</button>

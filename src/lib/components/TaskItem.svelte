@@ -81,16 +81,26 @@
 				aria-checked={task.done}
 				aria-disabled={gated}
 				aria-label={task.done ? `Mark "${task.title}" as not done` : `Mark "${task.title}" as done`}
-				class="chk h-11 w-14 shrink-0 border-2 border-f font-bold {gated
+				title={gated
+					? 'Completes automatically when every item is done'
+					: task.done
+						? 'Click to reopen'
+						: 'Click to complete'}
+				class="chk inline-flex h-11 shrink-0 items-center gap-2 border-2 border-f px-3 text-xs font-bold {task.done
+					? 'bg-f text-b'
+					: ''} {gated
 					? 'cursor-not-allowed opacity-50'
-					: ''}"
+					: task.done
+						? ''
+						: 'hover:bg-f hover:text-b'}"
 				disabled={gated}
 				onclick={() => ontoggle(task.id)}
 			>
-				{task.done ? '[X]' : '[ ]'}
+				<span aria-hidden="true" class="text-sm">{task.done ? '[X]' : '[ ]'}</span>
+				<span aria-hidden="true">{gated ? 'AUTO' : task.done ? 'UNDO' : 'DO IT'}</span>
 			</button>
 			<span
-				class="min-w-0 flex-1 break-words transition-opacity duration-200"
+				class="min-w-40 flex-1 break-words transition-opacity duration-200"
 				class:line-through={task.done}
 				class:opacity-75={task.done}
 			>

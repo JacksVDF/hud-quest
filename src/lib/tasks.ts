@@ -17,12 +17,16 @@ export interface Task {
 	items: Item[];
 	/** Free-form project notes (hard tasks only). */
 	notes: string;
+	/** When the task was moved to the trash (ms since epoch). Absent for active tasks. */
+	deletedAt?: number;
 }
 
 export const STORAGE_KEY = 'hud-quest-todo:tasks';
 export const MAX_TAGS = 3;
 export const MAX_TAG_LENGTH = 20;
 export const MAX_NOTES_LENGTH = 1000;
+/** Trashed tasks are removed for good after this many days. */
+export const TRASH_DAYS = 30;
 
 /* ---------- tags ---------- */
 
@@ -87,6 +91,21 @@ export function reconcileDone(task: Task): boolean {
 	return allItemsDone(task);
 }
 
+/* ---------- trash ---------- */
+
+/** Drops tasks that have been in the trash longer than `TRASH_DAYS`. */
+export function dropExpired(tasks: Task[], now: number): Task[] {
+	const limit = TRASH_DAYS * 24 * 60 * 60 * 1000;
+	return tasks.filter((t) => t.deletedAt === undefined || now - t.deletedAt < limit);
+}
+
+/** Whole days left before a trashed task is removed for good (at least 1 while it exists). */
+export function daysLeftInTrash(task: Task, now: number): number {
+	if (task.deletedAt === undefined) return TRASH_DAYS;
+	const left = TRASH_DAYS * 24 * 60 * 60 * 1000 - (now - task.deletedAt);
+	return Math.max(1, Math.ceil(left / (24 * 60 * 60 * 1000)));
+}
+
 /* ---------- filtering ---------- */
 
 export type StatusFilter = 'all' | 'open' | 'done';
@@ -142,6 +161,7 @@ function toTask(value: unknown): Task | null {
 		complexity === 'hard' && typeof t.notes === 'string' ? t.notes.slice(0, MAX_NOTES_LENGTH) : '';
 
 	const task: Task = { id: t.id, title: t.title, complexity, done: t.done, tags, items, notes };
+	if (typeof t.deletedAt === 'number' && Number.isFinite(t.deletedAt)) task.deletedAt = t.deletedAt;
 	task.done = reconcileDone(task);
 	return task;
 }

@@ -49,6 +49,10 @@ npm run test:e2e   # browser tests (Playwright, builds the app and uses installe
 
 **Tags and filters:** up to 3 tags per task (20 characters each, lowercased). Filter the list by status (all/open/done) and by tags; selecting several tags shows tasks that have all of them. Filters reset on reload. The list shows 10 tasks per page, with numbered page buttons.
 
+**Trash:** deleting a task moves it to the `_TRASH;` section instead of removing it. A trashed task gives no XP, can be restored (its XP returns) or deleted forever, and is removed automatically after 30 days. It is saved with the rest of the list (browser or account), and counts toward the 500-task account limit.
+
+**Feedback:** messages close by themselves after 6 seconds with a visible countdown; hovering or focusing a message pauses it. The header (logo, login/account, theme) stays at the top while scrolling, and changing page scrolls back to the first task.
+
 **Accounts and storage:**
 
 - Without an account (guest), tasks are kept in the browser (`localStorage`).

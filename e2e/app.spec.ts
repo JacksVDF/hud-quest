@@ -77,9 +77,9 @@ test('a hard project releases XP per milestone', async ({ page }) => {
 		await task.getByRole('button', { name: 'ADD', exact: true }).click();
 	}
 	await task.getByRole('checkbox', { name: 'Mark milestone "a" as done' }).click();
-	await expect(page.getByText('Milestone completed: +25 XP.')).toBeVisible();
+	await expect(page.getByText('Milestone completed: +25 XP.').last()).toBeVisible();
 	await task.getByRole('checkbox', { name: 'Mark milestone "b" as done' }).click();
-	await expect(page.getByText('Milestone completed: +25 XP.')).toBeVisible();
+	await expect(page.getByText('Milestone completed: +25 XP.').last()).toBeVisible();
 	await expect(
 		task.getByRole('checkbox', { name: 'Mark "Big project" as not done' })
 	).toBeVisible();
@@ -149,4 +149,113 @@ test('theme toggle switches between light and dark', async ({ page }) => {
 	await page.getByRole('button', { name: 'Toggle light/dark theme' }).click();
 	const after = await page.evaluate(() => document.documentElement.dataset.theme);
 	expect(after).not.toBe(before);
+});
+
+test('explains when a tag is already added', async ({ page }) => {
+	const tags = page.getByLabel('TAGS_');
+	await tags.fill('work');
+	await tags.press('Enter');
+	await tags.fill('Work');
+	await tags.press('Enter');
+	await expect(page.getByText('#work is already added.')).toBeVisible();
+	// Typing again clears the message.
+	await tags.fill('h');
+	await expect(page.getByText('is already added')).toHaveCount(0);
+});
+
+test('the complete control says what it does', async ({ page }) => {
+	await addTask(page, 'Clear control');
+	const box = page.getByRole('checkbox', { name: 'Mark "Clear control" as done' });
+	await expect(box).toContainText('DO IT');
+	await box.click();
+	await expect(
+		page.getByRole('checkbox', { name: 'Mark "Clear control" as not done' })
+	).toContainText('UNDO');
+
+	await addTask(page, 'Has steps', 'MEDIUM');
+	await page.getByRole('button', { name: /SUBTASKS/ }).click();
+	await page.getByLabel(/subtask/i).fill('step');
+	await page.keyboard.press('Enter');
+	await expect(page.getByRole('checkbox', { name: 'Mark "Has steps" as done' })).toContainText(
+		'AUTO'
+	);
+});
+
+test('the banner counts down and closes by itself, and pauses on hover', async ({ page }) => {
+	await addTask(page, 'Timer');
+	await page.getByRole('checkbox', { name: 'Mark "Timer" as done' }).click();
+	const banner = page.getByText('Task completed: +10 XP.');
+	const countdown = page.getByTestId('banner-countdown');
+	await expect(banner).toBeVisible();
+	await expect(countdown).toHaveText('6s');
+
+	// Hovering pauses the countdown.
+	await banner.hover();
+	await expect(countdown).toHaveText('||');
+	await page.waitForTimeout(1500);
+	await expect(countdown).toHaveText('||');
+
+	// Moving away resumes it, and it closes on its own.
+	await page.mouse.move(0, 0);
+	await expect(banner).toHaveCount(0, { timeout: 10_000 });
+});
+
+test('the header stays visible while scrolling', async ({ page }) => {
+	for (let i = 1; i <= 8; i++) await addTask(page, `scroll ${i}`);
+	await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
+	const header = page.getByTestId('app-header');
+	await expect(header).toBeInViewport({ ratio: 1 });
+	expect((await header.boundingBox())!.y).toBeLessThanOrEqual(1);
+	await expect(page.getByRole('button', { name: 'Toggle light/dark theme' })).toBeInViewport();
+});
+
+test('changing page scrolls back to the first task of that page', async ({ page }) => {
+	for (let i = 1; i <= 12; i++) await addTask(page, `task ${String(i).padStart(2, '0')}`);
+	const pager = page.getByRole('navigation', { name: 'Pagination' });
+	await pager.scrollIntoViewIfNeeded();
+	await pager.getByRole('button', { name: 'Next page' }).click();
+	const first = page.getByText('task 11', { exact: true });
+	await expect(first).toBeVisible();
+	await expect
+		.poll(async () => (await first.boundingBox())!.y, { message: 'first task near the top' })
+		.toBeLessThan(300);
+	expect(await page.evaluate(() => window.scrollY)).toBeGreaterThan(0);
+});
+
+test('deleted tasks go to the trash, can be restored, and expire only by choice', async ({
+	page
+}) => {
+	await addTask(page, 'Bin me');
+	await page.getByRole('checkbox', { name: 'Mark "Bin me" as done' }).click();
+	await expect(page.getByText('Task completed: +10 XP.')).toBeVisible();
+
+	await page.getByRole('button', { name: 'Delete "Bin me"' }).click();
+	await expect(page.getByText('Task moved to trash: -10 XP.')).toBeVisible();
+	await expect(page.getByText('No tasks yet')).toBeVisible();
+
+	// It is in the trash and survives a reload.
+	await page.reload();
+	await expect(page.getByText('loading…')).toHaveCount(0);
+	await page.getByRole('button', { name: /_TRASH/ }).click();
+	await expect(page.getByText('Bin me')).toBeVisible();
+	await expect(page.getByText('30d left')).toBeVisible();
+
+	await page.getByRole('button', { name: 'Restore "Bin me"' }).click();
+	await expect(page.getByText('Task restored: +10 XP.')).toBeVisible();
+	await expect(page.getByTestId('trash')).toHaveCount(0);
+	await expect(page.getByRole('checkbox', { name: 'Mark "Bin me" as not done' })).toBeVisible();
+
+	// Delete forever, one by one and all at once.
+	await page.getByRole('button', { name: 'Delete "Bin me"' }).click();
+	await page.getByRole('button', { name: /_TRASH/ }).click();
+	await page.getByRole('button', { name: 'Delete "Bin me" forever' }).click();
+	await expect(page.getByTestId('trash')).toHaveCount(0);
+
+	await addTask(page, 'one');
+	await addTask(page, 'two');
+	await page.getByRole('button', { name: 'Delete "one"' }).click();
+	await page.getByRole('button', { name: 'Delete "two"' }).click();
+	await page.getByRole('button', { name: /_TRASH/ }).click();
+	await page.getByRole('button', { name: 'EMPTY TRASH' }).click();
+	await expect(page.getByTestId('trash')).toHaveCount(0);
 });

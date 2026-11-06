@@ -14,6 +14,6 @@
 	}
 </script>
 
-<button type="button" class="btn o" onclick={toggle} aria-label="Toggle light/dark theme">
+<button type="button" class="btn o sm" onclick={toggle} aria-label="Toggle light/dark theme">
 	THEME:{theme === 'light' ? 'LIGHT' : 'DARK'}
 </button>

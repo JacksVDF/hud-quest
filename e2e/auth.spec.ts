@@ -245,3 +245,19 @@ test('deleting an account requires the password in the request', async ({ page }
 	expect(res.status()).toBe(400);
 	expect((await page.request.get('/api/tasks')).status()).toBe(200);
 });
+
+test('trash is kept in the account and restores in another session', async ({ page }) => {
+	await signUp(page, uniqueEmail());
+	await page.getByLabel('NEW_TASK_').fill('Remote bin');
+	await page.getByRole('button', { name: /^ADD >/ }).click();
+	await expect(page.getByText('Remote bin')).toBeVisible();
+	await page.getByRole('button', { name: 'Delete "Remote bin"' }).click();
+	await expect
+		.poll(async () => JSON.stringify(await (await page.request.get('/api/tasks')).json()))
+		.toContain('deletedAt');
+
+	await page.reload();
+	await page.getByRole('button', { name: /_TRASH/ }).click();
+	await page.getByRole('button', { name: 'Restore "Remote bin"' }).click();
+	await expect(page.getByRole('checkbox', { name: 'Mark "Remote bin" as done' })).toBeVisible();
+});

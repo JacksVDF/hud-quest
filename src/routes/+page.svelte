@@ -1,13 +1,14 @@
 <script lang="ts">
-	import { onMount } from 'svelte';
-	import { fade, fly } from 'svelte/transition';
+	import { onMount, tick } from 'svelte';
 	import AccountMenu from '#lib/components/AccountMenu.svelte';
+	import AppHeader from '#lib/components/AppHeader.svelte';
+	import Banner from '#lib/components/Banner.svelte';
 	import FilterBar from '#lib/components/FilterBar.svelte';
 	import LevelCard from '#lib/components/LevelCard.svelte';
 	import Pagination from '#lib/components/Pagination.svelte';
 	import TaskForm from '#lib/components/TaskForm.svelte';
 	import TaskItem from '#lib/components/TaskItem.svelte';
-	import ThemeToggle from '#lib/components/ThemeToggle.svelte';
+	import Trash from '#lib/components/Trash.svelte';
 	import { ms } from '#lib/motion.ts';
 	import { session } from '#lib/session.svelte.ts';
 	import {
@@ -21,6 +22,13 @@
 	import { allTags, filterTasks, type StatusFilter, type Task } from '#lib/tasks.ts';
 
 	let message = $state('');
+	// Changes with every message, so the same text twice in a row restarts the countdown.
+	let bannerKey = $state(0);
+
+	function say(text: string) {
+		message = text;
+		bannerKey++;
+	}
 	// Filters live only in memory, so they reset on reload.
 	let selectedTags = $state<string[]>([]);
 	let status = $state<StatusFilter>('all');
@@ -43,7 +51,7 @@
 			const added = await taskStore.importTasks(guestTasks);
 			clearGuestTasks();
 			guestTasks = [];
-			message = `[✓] Imported ${added} task${added === 1 ? '' : 's'} into your account.`;
+			say(`[✓] Imported ${added} task${added === 1 ? '' : 's'} into your account.`);
 		} catch {
 			importFailed = true;
 		}
@@ -60,12 +68,13 @@
 		if (!change || change.delta === 0) {
 			message = '';
 		} else if (change.delta > 0) {
-			message =
+			say(
 				change.levelAfter > change.levelBefore
 					? `[✓] LEVEL UP! You reached level ${change.levelAfter}. +${change.delta} XP.`
-					: `[✓] ${up}: +${change.delta} XP.`;
+					: `[✓] ${up}: +${change.delta} XP.`
+			);
 		} else {
-			message = `[!] ${down}: ${change.delta} XP.`;
+			say(`[!] ${down}: ${change.delta} XP.`);
 		}
 	}
 
@@ -90,6 +99,15 @@
 	const page = $derived(clampPage(requestedPage, visible.length));
 	const pageTasks = $derived(paginate(visible, page));
 
+	let listEl = $state<HTMLElement>();
+
+	/** Changes page and brings the first task of that page into view (below the sticky header). */
+	async function goToPage(p: number) {
+		requestedPage = p;
+		await tick();
+		listEl?.scrollIntoView({ block: 'start', behavior: ms(1) === 0 ? 'auto' : 'smooth' });
+	}
+
 	// A new filter always starts on page 1.
 	$effect(() => {
 		void [activeTags.join(), status];
@@ -113,14 +131,11 @@
 </svelte:head>
 
 <div class="mx-auto max-w-3xl px-4 pb-16 sm:px-6">
-	<header class="flex items-center justify-between gap-4 py-5">
-		<div class="h text-lg tracking-widest sm:text-xl">X HUD//QUEST</div>
-		<div class="flex items-center gap-3">
+	<AppHeader>
+		{#snippet account()}
 			<AccountMenu onsignout={signOut} />
-			<ThemeToggle />
-		</div>
-	</header>
-	<div class="gl h-1 grow" aria-hidden="true"></div>
+		{/snippet}
+	</AppHeader>
 
 	<main class="mt-8 flex flex-col gap-8">
 		<h1 class="h text-4xl sm:text-5xl">_TASKS;</h1>
@@ -134,27 +149,9 @@
 
 		<!-- Old and new banners share one grid cell so a replaced message cross-fades in place. -->
 		<div aria-live="polite" class="grid min-h-12">
-			{#key message}
+			{#key bannerKey}
 				{#if message}
-					<p
-						in:fly|global={{ y: -10, duration: ms(220) }}
-						out:fade|global={{ duration: ms(150) }}
-						class="col-start-1 row-start-1 flex items-center justify-between gap-3 p-3 text-sm {message.startsWith(
-							'[✓]'
-						)
-							? 'bg-f text-b'
-							: 'border-2 border-f'} {message.includes('LEVEL UP') ? 'gline pb-4' : ''}"
-					>
-						<span>{message}</span>
-						<button
-							type="button"
-							class="font-bold"
-							onclick={() => (message = '')}
-							aria-label="Dismiss"
-						>
-							[X]
-						</button>
-					</p>
+					<Banner {message} onclose={() => (message = '')} />
 				{/if}
 			{/key}
 		</div>
@@ -211,13 +208,14 @@
 				{#if visible.length === 0}
 					<p class="text-sm">&gt; No tasks match the current filters.</p>
 				{:else}
-					<ul class="flex flex-col gap-4">
+					<ul class="flex scroll-mt-28 flex-col gap-4" bind:this={listEl}>
 						{#each pageTasks as task (task.id)}
 							<TaskItem
 								{task}
 								ontoggle={toggle}
 								onsave={(id, patch) => taskStore.update(id, patch)}
-								onremove={(id) => announce(taskStore.remove(id), 'Task deleted', 'Task deleted')}
+								onremove={(id) =>
+									announce(taskStore.remove(id), 'Task moved to trash', 'Task moved to trash')}
 								onadditem={(id, title) =>
 									announce(taskStore.addItem(id, title), 'XP updated', 'XP updated')}
 								ontoggleitem={(id, itemId) => {
@@ -229,13 +227,17 @@
 							/>
 						{/each}
 					</ul>
-					<Pagination
-						bind:page={() => page, (p) => (requestedPage = p)}
-						count={pageCount(visible.length)}
-					/>
+					<Pagination bind:page={() => page, goToPage} count={pageCount(visible.length)} />
 				{/if}
 			{/if}
 		</section>
+
+		<Trash
+			tasks={taskStore.trash}
+			onrestore={(id) => announce(taskStore.restore(id), 'Task restored', 'Task restored')}
+			onpurge={(id) => taskStore.purge(id)}
+			onempty={() => taskStore.emptyTrash()}
+		/>
 	</main>
 
 	<footer class="mt-16 border-t-2 border-f pt-4 text-xs">HANDLE_WITH_CARE;</footer>
