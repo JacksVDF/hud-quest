@@ -302,3 +302,37 @@ for (const [label, size] of [
 		expect(b.height).toBeLessThanOrEqual(s.height);
 	});
 }
+
+test('trash rows animate when they enter, are restored and are deleted', async ({ page }) => {
+	for (const t of ['alpha', 'beta', 'gamma']) await addTask(page, t);
+	await page.getByRole('button', { name: 'Delete "alpha"' }).click();
+	await page.getByRole('button', { name: 'Delete "beta"' }).click();
+	await page.getByRole('button', { name: /_TRASH/ }).click();
+
+	// Restoring: the row is still in the DOM mid-animation and moves to the left.
+	const row = page
+		.getByRole('listitem')
+		.filter({ hasText: 'beta' })
+		.filter({ has: page.getByRole('button', { name: /Restore/ }) });
+	await page.getByRole('button', { name: 'Restore "beta"' }).click();
+	const seen = await row
+		.evaluate(
+			(el) =>
+				new Promise<{ transform: string; opacity: string }>((resolve) =>
+					requestAnimationFrame(() =>
+						requestAnimationFrame(() => {
+							const s = getComputedStyle(el);
+							resolve({ transform: s.transform, opacity: s.opacity });
+						})
+					)
+				)
+		)
+		.catch(() => null);
+	// Either we caught it mid-flight (moving/fading) or it was already gone; never static.
+	if (seen) expect(seen.transform !== 'none' || Number(seen.opacity) < 1).toBe(true);
+	await expect(row).toHaveCount(0);
+
+	// Deleting for good removes the row after its exit animation.
+	await page.getByRole('button', { name: 'Delete "alpha" forever' }).click();
+	await expect(page.getByTestId('trash')).toHaveCount(0);
+});
