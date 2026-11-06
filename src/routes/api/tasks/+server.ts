@@ -18,9 +18,9 @@ const headersFor = (version: number) => ({
 	etag: `"${version}"`
 });
 
-/** Reads `If-Match: "3"` as 3; null when missing or not a version. */
+/** Reads `If-Match: "3"` (or the weak form `W/"3"`) as 3; null when missing or not a version. */
 function parseIfMatch(value: string | null): number | null {
-	const match = value?.match(/^"?(\d+)"?$/);
+	const match = value?.match(/^(?:W\/)?"?(\d+)"?$/);
 	return match ? Number(match[1]) : null;
 }
 

@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { ConflictError, createRemoteStorage } from './storage';
+import { ConflictError, createRemoteStorage, versionOf } from './storage';
 import { STORAGE_KEY, type Task } from './tasks';
 import { TaskStore } from './task-store.svelte';
 
@@ -332,6 +332,21 @@ describe('createRemoteStorage', () => {
 		expect(sent).toEqual(['"5"', '"6"']);
 	});
 
+	it('works when the server answers with weak ETags', async () => {
+		const sent: Array<string | null> = [];
+		const weak = (body: unknown, v: number) =>
+			new Response(JSON.stringify(body), { headers: { etag: `W/"${v}"` } });
+		const fetcher = vi.fn(async (_url: string, init?: RequestInit) => {
+			if (!init) return weak([seed('a')], 4);
+			sent.push(new Headers(init.headers).get('if-match'));
+			return weak([], 5);
+		});
+		const storage = createRemoteStorage(asFetch(fetcher));
+		expect((await storage.load()).map((t) => t.id)).toEqual(['a']);
+		await storage.save([seed('b')]);
+		expect(sent).toEqual(['"4"']);
+	});
+
 	it('throws ConflictError on 412', async () => {
 		const fetcher = vi.fn(async (_url: string, init?: RequestInit) =>
 			init ? new Response('changed', { status: 412 }) : reply([], 1)
@@ -360,6 +375,23 @@ describe('createRemoteStorage', () => {
 		releaseFirst();
 		await Promise.all([a, b]);
 		expect(order).toEqual(['start one', 'end one', 'start two', 'end two']);
+	});
+});
+
+describe('versionOf (ETag)', () => {
+	const withEtag = (etag?: string) =>
+		new Response('[]', { headers: etag === undefined ? {} : { etag } });
+
+	it('reads strong and weak ETags (Cloudflare weakens them when compressing)', () => {
+		expect(versionOf(withEtag('"3"'))).toBe(3);
+		expect(versionOf(withEtag('W/"3"'))).toBe(3);
+		expect(versionOf(withEtag('"0"'))).toBe(0);
+	});
+
+	it('rejects a missing or malformed ETag', () => {
+		expect(() => versionOf(withEtag())).toThrow();
+		expect(() => versionOf(withEtag('"abc"'))).toThrow();
+		expect(() => versionOf(withEtag('""'))).toThrow();
 	});
 });
 

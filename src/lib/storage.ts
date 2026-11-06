@@ -31,9 +31,13 @@ export class ConflictError extends Error {
 	}
 }
 
-/** The version the server sent as ETag (`"3"` -> 3). */
-function versionOf(res: Response): number {
-	const n = Number(res.headers.get('etag')?.replaceAll('"', ''));
+/**
+ * The version the server sent as ETag (`"3"` -> 3). Cloudflare turns strong ETags into
+ * weak ones (`W/"3"`) when it compresses the response, so both forms must be accepted.
+ */
+export function versionOf(res: Response): number {
+	const raw = res.headers.get('etag')?.replace(/^W\//, '').replaceAll('"', '');
+	const n = raw ? Number(raw) : NaN;
 	if (!Number.isInteger(n)) throw new Error('The server sent no version');
 	return n;
 }

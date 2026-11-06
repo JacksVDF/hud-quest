@@ -147,3 +147,21 @@ test('requires a version to save', async ({ browser }) => {
 	).toBe(400);
 	await user.close();
 });
+
+test('accepts weak ETags, which Cloudflare sends when it compresses responses', async ({
+	browser
+}) => {
+	const user = await newUser(browser);
+	const saved = await user.api.put('/api/tasks', {
+		data: [task('a', 'First')],
+		headers: { 'if-match': 'W/"0"' }
+	});
+	expect(saved.status()).toBe(200);
+	// A stale weak version is still refused.
+	const stale = await user.api.put('/api/tasks', {
+		data: [],
+		headers: { 'if-match': 'W/"0"' }
+	});
+	expect(stale.status()).toBe(412);
+	await user.close();
+});
