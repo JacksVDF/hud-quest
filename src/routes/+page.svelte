@@ -18,9 +18,10 @@
 		createRemoteStorage,
 		readGuestTasks
 	} from '#lib/storage.ts';
-	import { clampPage, pageCount, paginate } from '#lib/pagination.ts';
+	import { PAGE_SIZE, clampPage, pageCount, paginate } from '#lib/pagination.ts';
 	import { taskStore, type Change } from '#lib/task-store.svelte.ts';
 	import { allTags, filterTasks, type StatusFilter, type Task } from '#lib/tasks.ts';
+	import type { Complexity } from '#lib/xp.ts';
 
 	let message = $state('');
 	// Changes with every message, so the same text twice in a row restarts the countdown.
@@ -109,6 +110,13 @@
 		listEl?.scrollIntoView({ block: 'start', behavior: ms(1) === 0 ? 'auto' : 'smooth' });
 	}
 
+	/** Adds a task and opens the page where it landed, unless the current filters hide it. */
+	function addTask(title: string, complexity: Complexity, tags: string[]) {
+		const id = taskStore.add(title, complexity, tags);
+		const index = visible.findIndex((t) => t.id === id);
+		if (index >= 0) requestedPage = Math.floor(index / PAGE_SIZE) + 1;
+	}
+
 	// A new filter always starts on page 1.
 	$effect(() => {
 		void [activeTags.join(), status];
@@ -143,10 +151,7 @@
 
 		<LevelCard info={taskStore.levelInfo} totalXp={taskStore.xp} />
 
-		<TaskForm
-			disabled={!taskStore.loaded}
-			onadd={(title, c, tags) => taskStore.add(title, c, tags)}
-		/>
+		<TaskForm disabled={!taskStore.loaded} onadd={addTask} />
 
 		<!-- Fixed height (two lines on mobile), so a message never pushes the page down or up.
 		     Old and new banners share one grid cell so a replaced message cross-fades in place. -->

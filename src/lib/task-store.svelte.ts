@@ -124,11 +124,13 @@ export class TaskStore {
 		return this.#all.find((t) => t.id === id && t.deletedAt !== undefined);
 	}
 
-	add(title: string, complexity: Complexity, tags: string[] = []) {
+	/** Adds a task at the end of the list and returns its id (undefined if nothing was added). */
+	add(title: string, complexity: Complexity, tags: string[] = []): string | undefined {
 		const clean = title.trim();
 		if (!clean || !this.loaded) return;
+		const id = crypto.randomUUID();
 		this.#all.push({
-			id: crypto.randomUUID(),
+			id,
 			title: clean,
 			complexity,
 			done: false,
@@ -137,6 +139,7 @@ export class TaskStore {
 			notes: ''
 		});
 		this.#save();
+		return id;
 	}
 
 	/** Complexity is intentionally not editable for now. */

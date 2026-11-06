@@ -72,7 +72,16 @@
 								x: leaving === 'restore' ? -MOTION.travel : MOTION.travel
 							}}
 						>
-							<span class="min-w-0 flex-1 break-words opacity-75">{task.title}</span>
+							<div class="flex min-w-0 flex-1 flex-col gap-1">
+								<span class="break-words opacity-75">{task.title}</span>
+								{#if task.tags.length > 0}
+									<ul class="flex flex-wrap gap-1 opacity-75" aria-label="Tags">
+										{#each task.tags as tag (tag)}
+											<li class="tag">#{tag}</li>
+										{/each}
+									</ul>
+								{/if}
+							</div>
 							<span class="tag">{daysLeftInTrash(task, now)}d left</span>
 							<div class="flex gap-2">
 								<button

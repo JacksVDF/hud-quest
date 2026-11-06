@@ -20,6 +20,7 @@ npm run deploy     # build and deploy to Cloudflare (needs `npx wrangler login` 
 2. `npm run db:migrate:remote` (applies the files in `migrations/` to the real D1 database)
 3. `npx wrangler secret put BETTER_AUTH_SECRET` (a long random value; never commit it)
 4. `npm run deploy`
+5. `npm run smoke` (checks the live site with a throwaway account that it deletes at the end; pass another URL as `npm run smoke -- https://...`)
 
 `BETTER_AUTH_URL` is optional; without it the app uses the URL of each request.
 

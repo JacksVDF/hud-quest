@@ -42,6 +42,13 @@ describe('TaskStore basics', () => {
 		expect(JSON.parse(data.get(STORAGE_KEY) ?? '[]')).toHaveLength(1);
 	});
 
+	it('returns the id of the new task, and nothing for a blank title', () => {
+		const { store } = fresh();
+		expect(store.add('   ', 'easy')).toBeUndefined();
+		const id = store.add('Find me', 'easy');
+		expect(store.tasks.map((t) => t.id)).toEqual([id]);
+	});
+
 	it('ignores blank titles', () => {
 		const { store } = fresh();
 		store.add('   ', 'easy');

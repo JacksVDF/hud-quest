@@ -107,6 +107,8 @@ test('paginates long lists', async ({ page }) => {
 	for (let i = 1; i <= 12; i++) await addTask(page, `task ${String(i).padStart(2, '0')}`);
 	const pager = page.getByRole('navigation', { name: 'Pagination' });
 	await expect(pager.getByRole('button', { name: 'Page 2' })).toBeVisible();
+	// The last added task opened its page, so go back to the first one.
+	await pager.getByRole('button', { name: 'Page 1' }).click();
 	await expect(pager.getByRole('button', { name: 'Page 1' })).toHaveAttribute(
 		'aria-current',
 		'page'
@@ -123,6 +125,26 @@ test('paginates long lists', async ({ page }) => {
 	await page.getByRole('button', { name: 'Delete "task 12"' }).click();
 	await expect(pager).toHaveCount(0);
 	await expect(page.getByText('task 01')).toBeVisible();
+});
+
+test('a new task opens the page where it landed, unless a filter hides it', async ({ page }) => {
+	for (let i = 1; i <= 10; i++) await addTask(page, `task ${String(i).padStart(2, '0')}`);
+	await addTask(page, 'task 11');
+	const pager = page.getByRole('navigation', { name: 'Pagination' });
+	await expect(pager.getByRole('button', { name: 'Page 2' })).toHaveAttribute(
+		'aria-current',
+		'page'
+	);
+	await expect(page.getByText('task 11', { exact: true })).toBeVisible();
+	await expect(page.getByText('task 01')).toHaveCount(0);
+
+	// With a filter that hides the new task, the current page stays as it is.
+	await page.getByRole('button', { name: 'Page 1' }).click();
+	await page.getByRole('checkbox', { name: 'Mark "task 01" as done' }).click();
+	await page.getByText('DONE', { exact: true }).click();
+	await addTask(page, 'task 12');
+	await expect(page.getByText('task 12')).toHaveCount(0);
+	await expect(page.getByText('task 01', { exact: true })).toBeVisible();
 });
 
 test('touch targets are at least 36px tall', async ({ page }) => {
@@ -212,6 +234,8 @@ test('the header stays visible while scrolling', async ({ page }) => {
 test('changing page scrolls back to the first task of that page', async ({ page }) => {
 	for (let i = 1; i <= 12; i++) await addTask(page, `task ${String(i).padStart(2, '0')}`);
 	const pager = page.getByRole('navigation', { name: 'Pagination' });
+	await pager.getByRole('button', { name: 'Page 1' }).click();
+	await expect(page.getByText('task 01')).toBeVisible();
 	await pager.scrollIntoViewIfNeeded();
 	await pager.getByRole('button', { name: 'Next page' }).click();
 	const first = page.getByText('task 11', { exact: true });
@@ -258,6 +282,17 @@ test('deleted tasks go to the trash, can be restored, and expire only by choice'
 	await page.getByRole('button', { name: /_TRASH/ }).click();
 	await page.getByRole('button', { name: 'EMPTY TRASH' }).click();
 	await expect(page.getByTestId('trash')).toHaveCount(0);
+});
+
+test('trashed tasks keep showing their tags', async ({ page }) => {
+	await page.getByLabel('NEW_TASK_').fill('Tagged');
+	await page.getByLabel('TAGS_').fill('errand');
+	await page.getByLabel('TAGS_').press('Enter');
+	await page.getByRole('button', { name: /^ADD >/ }).click();
+	await expect(page.getByText('#errand')).toHaveCount(2); // filter chip + task tag
+	await page.getByRole('button', { name: 'Delete "Tagged"' }).click();
+	await page.getByRole('button', { name: /_TRASH/ }).click();
+	await expect(page.getByTestId('trash').getByText('#errand')).toBeVisible();
 });
 
 for (const [label, size] of [
