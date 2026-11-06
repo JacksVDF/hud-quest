@@ -39,15 +39,11 @@
 		</label>
 		<ComplexityPicker bind:value={complexity} />
 	</div>
-	<div class="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+	<div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
 		<div class="sm:max-w-sm sm:flex-1">
-			<TagInput bind:tags />
+			<TagInput bind:tags compact={false} />
 		</div>
-		<button
-			type="submit"
-			class="btn g self-start sm:self-auto"
-			disabled={disabled || !title.trim()}
-		>
+		<button type="submit" class="btn g self-start sm:mt-5" disabled={disabled || !title.trim()}>
 			ADD &gt;
 		</button>
 	</div>

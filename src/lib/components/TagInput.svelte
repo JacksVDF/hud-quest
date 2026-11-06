@@ -3,7 +3,14 @@
 	import { ms } from '#lib/motion.ts';
 	import { MAX_TAGS, MAX_TAG_LENGTH, addTag, normalizeTag } from '#lib/tasks.ts';
 
-	let { tags = $bindable() }: { tags: string[] } = $props();
+	let {
+		tags = $bindable(),
+		compact = true
+	}: {
+		tags: string[];
+		/** 36px input for the edit form; false gives the 44px input of the new-task form. */
+		compact?: boolean;
+	} = $props();
 
 	const uid = $props.id();
 	let draft = $state('');
@@ -52,7 +59,8 @@
 	<label for="tag-input-{uid}">TAGS_</label>
 	<input
 		id="tag-input-{uid}"
-		class="inp sm mt-1"
+		class="inp mt-1"
+		class:sm={compact}
 		bind:value={draft}
 		{oninput}
 		{onkeydown}

@@ -147,6 +147,29 @@ test('a new task opens the page where it landed, unless a filter hides it', asyn
 	await expect(page.getByText('task 01', { exact: true })).toBeVisible();
 });
 
+test('the ADD button lines up with the inputs on desktop', async ({ page }) => {
+	await page.setViewportSize({ width: 1280, height: 900 });
+	const box = async (locator: Locator) => (await locator.boundingBox())!;
+	const tagInput = page.getByLabel('TAGS_');
+	const add = page.getByRole('button', { name: /^ADD >/ });
+	const title = page.getByLabel('NEW_TASK_');
+
+	const before = await box(add);
+	expect(before.y).toBeCloseTo((await box(tagInput)).y, 0);
+	expect(before.height).toBeCloseTo((await box(tagInput)).height, 0);
+	// Same right edge as the complexity picker above it.
+	const picker = await box(page.getByRole('group', { name: 'COMPLEXITY_' }).locator('.grid'));
+	expect(before.x + before.width).toBeCloseTo(picker.x + picker.width, 0);
+
+	// Notices and chips grow below the input, so the button must not move.
+	await title.fill('x');
+	await tagInput.fill('one');
+	await tagInput.press('Enter');
+	await expect(page.getByText('#one')).toBeVisible();
+	const after = await box(add);
+	expect(after.y).toBeCloseTo(before.y, 0);
+});
+
 test('touch targets are at least 36px tall', async ({ page }) => {
 	await page.getByLabel('NEW_TASK_').fill('Tagged');
 	await page.getByLabel('TAGS_').fill('x');
