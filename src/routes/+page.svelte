@@ -147,8 +147,9 @@
 			onadd={(title, c, tags) => taskStore.add(title, c, tags)}
 		/>
 
-		<!-- Old and new banners share one grid cell so a replaced message cross-fades in place. -->
-		<div aria-live="polite" class="grid min-h-12">
+		<!-- Fixed height (two lines on mobile), so a message never pushes the page down or up.
+		     Old and new banners share one grid cell so a replaced message cross-fades in place. -->
+		<div aria-live="polite" class="grid h-[4.5rem] grid-rows-[minmax(0,1fr)] sm:h-16">
 			{#key bannerKey}
 				{#if message}
 					<Banner {message} onclose={() => (message = '')} />

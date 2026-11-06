@@ -114,7 +114,7 @@ test('account tasks follow the user to another browser session', async ({ page, 
 		.toBe(1);
 
 	const other = await browser.newContext({
-		extraHTTPHeaders: { 'cf-connecting-ip': '10.99.99.99' }
+		extraHTTPHeaders: { 'cf-connecting-ip': `10.${Math.floor(Math.random() * 254) + 1}.99.99` }
 	});
 	const page2 = await other.newPage();
 	await page2.goto('/login');

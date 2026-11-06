@@ -1,4 +1,4 @@
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test, type Locator, type Page } from '@playwright/test';
 
 test.beforeEach(async ({ page }) => {
 	await page.goto('/');
@@ -259,3 +259,46 @@ test('deleted tasks go to the trash, can be restored, and expire only by choice'
 	await page.getByRole('button', { name: 'EMPTY TRASH' }).click();
 	await expect(page.getByTestId('trash')).toHaveCount(0);
 });
+
+for (const [label, size] of [
+	['desktop', { width: 1280, height: 800 }],
+	['mobile', { width: 360, height: 800 }]
+] as const) {
+	test(`notifications do not move the page (${label})`, async ({ page }) => {
+		await page.setViewportSize(size);
+		for (let i = 0; i < 10; i++) await addTask(page, `lvl ${i}`);
+		const missions = page.getByRole('heading', { name: /_MISSIONS/ });
+		// Position in the document (not the window), so scrolling does not matter.
+		const top = (el: Locator) => el.evaluate((n) => n.getBoundingClientRect().top + scrollY);
+		const slot = page.locator('[aria-live="polite"]').first();
+		const before = {
+			missions: await top(missions),
+			slot: (await slot.boundingBox())!.height
+		};
+
+		// A short message, then the longest one (level up) that wraps on small screens.
+		const boxes = page.getByRole('checkbox', { name: /Mark "lvl \d" as done/ });
+		await boxes.first().click();
+		await expect(page.getByText(/Task completed: \+10 XP\./)).toBeVisible();
+		expect(await top(missions)).toBe(before.missions);
+
+		for (let i = 1; i < 10; i++) await boxes.first().click();
+		const levelUp = page.getByText(/LEVEL UP! You reached level 2/);
+		await expect(levelUp).toBeVisible();
+		expect(await top(missions)).toBe(before.missions);
+		expect((await slot.boundingBox())!.height).toBe(before.slot);
+
+		// And when it goes away.
+		await page.getByRole('button', { name: 'Dismiss' }).last().click();
+		await expect(levelUp).toHaveCount(0);
+		expect(await top(missions)).toBe(before.missions);
+
+		// Whatever the message, it fits inside the reserved slot.
+		await page.getByRole('checkbox', { name: /Mark "lvl 0" as not done/ }).click();
+		const reopened = page.getByText(/Task reopened: -10 XP\./);
+		await expect(reopened).toBeVisible();
+		const b = (await reopened.locator('xpath=..').boundingBox())!;
+		const s = (await slot.boundingBox())!;
+		expect(b.height).toBeLessThanOrEqual(s.height);
+	});
+}

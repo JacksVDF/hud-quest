@@ -28,7 +28,7 @@
 	onmouseleave={() => (paused = false)}
 	onfocusin={() => (paused = true)}
 	onfocusout={() => (paused = false)}
-	class="col-start-1 row-start-1 flex items-center justify-between gap-3 p-3 text-sm {message.startsWith(
+	class="col-start-1 row-start-1 flex min-h-0 items-center justify-between gap-3 overflow-hidden p-3 text-sm {message.startsWith(
 		'[✓]'
 	)
 		? 'bg-f text-b'
