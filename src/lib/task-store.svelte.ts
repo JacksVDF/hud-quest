@@ -265,8 +265,12 @@ export class TaskStore {
 		return this.#change(() => {
 			if (!this.#workspaces.some((w) => w.id === id)) return;
 			const now = Date.now();
+			const origin = this.workspaceName(id);
 			for (const t of this.#all) {
-				if (t.workspaceId === id && t.deletedAt === undefined) t.deletedAt = now;
+				if (t.workspaceId !== id) continue;
+				// Tasks already in the trash keep their own date; they only learn the name.
+				if (t.deletedAt === undefined) t.deletedAt = now;
+				t.originName = origin;
 			}
 			this.#workspaces = this.#workspaces.filter((w) => w.id !== id);
 		});
@@ -278,12 +282,12 @@ export class TaskStore {
 	}
 
 	/**
-	 * Where a trashed task came from: its workspace name, INBOX, or a note when that
-	 * workspace was deleted.
+	 * Where a trashed task came from: its workspace name (as it was when the workspace was
+	 * deleted, if it no longer exists) or INBOX.
 	 */
 	originOf(task: Task): string {
 		if (task.workspaceId === undefined) return 'INBOX';
-		return this.#workspaces.find((w) => w.id === task.workspaceId)?.name ?? 'deleted workspace';
+		return this.workspaceName(task.workspaceId) || task.originName || 'a deleted workspace';
 	}
 
 	/** Complexity is intentionally not editable for now. */
@@ -350,6 +354,7 @@ export class TaskStore {
 			const task = this.#findInTrash(id);
 			if (!task) return;
 			delete task.deletedAt;
+			delete task.originName;
 			if (this.#validWorkspace(task.workspaceId) === undefined) delete task.workspaceId;
 		});
 	}

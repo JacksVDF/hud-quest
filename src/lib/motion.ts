@@ -1,9 +1,20 @@
 import { cubicIn } from 'svelte/easing';
 import { slide, type TransitionConfig } from 'svelte/transition';
 
-/** Transition duration in ms; 0 when the user prefers reduced motion (or during SSR). */
+let navigating = false;
+
+/**
+ * Set by the root layout while the app moves to another page. A "global" exit animation keeps
+ * the whole old page on screen until it ends, so the old and new page would show together;
+ * during a navigation every duration is 0 and the old page leaves at once.
+ */
+export function setNavigating(value: boolean) {
+	navigating = value;
+}
+
+/** Transition duration in ms; 0 when the user prefers reduced motion, while navigating, or during SSR. */
 export function ms(duration: number): number {
-	if (typeof matchMedia === 'undefined') return 0;
+	if (navigating || typeof matchMedia === 'undefined') return 0;
 	return matchMedia('(prefers-reduced-motion: reduce)').matches ? 0 : duration;
 }
 

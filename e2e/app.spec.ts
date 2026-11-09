@@ -325,7 +325,7 @@ for (const [label, size] of [
 	test(`notifications do not move the page (${label})`, async ({ page }) => {
 		await page.setViewportSize(size);
 		for (let i = 0; i < 10; i++) await addTask(page, `lvl ${i}`);
-		const missions = page.getByRole('heading', { name: /_MISSIONS/ });
+		const missions = page.getByRole('heading', { name: /_INBOX/ });
 		// Position in the document (not the window), so scrolling does not matter.
 		const top = (el: Locator) => el.evaluate((n) => n.getBoundingClientRect().top + scrollY);
 		const slot = page.locator('[aria-live="polite"]').first();

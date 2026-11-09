@@ -17,6 +17,9 @@ async function newUser(browser: Browser) {
 	return { api, close: () => context.close() };
 }
 
+const doc = (tasks: unknown[] = [], workspaces: unknown[] = []) => ({ workspaces, tasks });
+const titles = (data: { tasks: { title: string }[] }) => data.tasks.map((t) => t.title);
+
 const task = (id: string, title: string) => ({
 	id,
 	title,
@@ -46,10 +49,10 @@ test('requires a session', async ({ playwright, baseURL }) => {
 
 test('saves and loads a user’s tasks', async ({ browser }) => {
 	const user = await newUser(browser);
-	expect(await (await user.api.get('/api/tasks')).json()).toEqual([]);
-	expect((await put(user.api, [task('a', 'Mine')])).ok()).toBe(true);
+	expect(await (await user.api.get('/api/tasks')).json()).toEqual(doc());
+	expect((await put(user.api, doc([task('a', 'Mine')]))).ok()).toBe(true);
 	const saved = await (await user.api.get('/api/tasks')).json();
-	expect(saved).toMatchObject([{ id: 'a', title: 'Mine' }]);
+	expect(saved).toMatchObject({ workspaces: [], tasks: [{ id: 'a', title: 'Mine' }] });
 	await user.close();
 });
 
@@ -57,18 +60,20 @@ test('users never see each other’s tasks', async ({ browser }) => {
 	const alice = await newUser(browser);
 	const bob = await newUser(browser);
 
-	await put(alice.api, [task('a1', 'Alice secret')]);
-	await put(bob.api, [task('b1', 'Bob secret')]);
+	await put(alice.api, doc([task('a1', 'Alice secret')], [{ id: 'wa', name: 'Alice space' }]));
+	await put(bob.api, doc([task('b1', 'Bob secret')]));
 
-	const aliceTasks = await (await alice.api.get('/api/tasks')).json();
-	const bobTasks = await (await bob.api.get('/api/tasks')).json();
-	expect(aliceTasks.map((t: { title: string }) => t.title)).toEqual(['Alice secret']);
-	expect(bobTasks.map((t: { title: string }) => t.title)).toEqual(['Bob secret']);
+	const aliceData = await (await alice.api.get('/api/tasks')).json();
+	const bobData = await (await bob.api.get('/api/tasks')).json();
+	expect(titles(aliceData)).toEqual(['Alice secret']);
+	expect(titles(bobData)).toEqual(['Bob secret']);
+	expect(bobData.workspaces).toEqual([]);
 
-	// Bob overwriting his list does not touch Alice's.
-	await put(bob.api, []);
+	// Bob overwriting his data does not touch Alice's.
+	await put(bob.api, doc());
 	const aliceAgain = await (await alice.api.get('/api/tasks')).json();
-	expect(aliceAgain).toHaveLength(1);
+	expect(aliceAgain.tasks).toHaveLength(1);
+	expect(aliceAgain.workspaces).toHaveLength(1);
 
 	await alice.close();
 	await bob.close();
@@ -76,8 +81,11 @@ test('users never see each other’s tasks', async ({ browser }) => {
 
 test('rejects bad input', async ({ browser }) => {
 	const user = await newUser(browser);
-	expect((await put(user.api, { not: 'a list' })).status()).toBe(400);
-	expect((await put(user.api, [task('a', 'ok'), { id: 1 }])).status()).toBe(400);
+	expect((await put(user.api, { not: 'a document' })).status()).toBe(400);
+	expect((await put(user.api, [task('a', 'ok')])).status()).toBe(400);
+	expect((await put(user.api, doc([task('a', 'ok'), { id: 1 }]))).status()).toBe(400);
+	expect((await put(user.api, doc([], [{ id: 'w', name: '' }]))).status()).toBe(400);
+	expect((await put(user.api, doc([], [{ id: 'w', name: 'Inbox' }]))).status()).toBe(400);
 	expect(
 		(
 			await user.api.put('/api/tasks', {
@@ -89,17 +97,19 @@ test('rejects bad input', async ({ browser }) => {
 	expect(
 		(
 			await user.api.put('/api/tasks', {
-				data: '[]',
+				data: '{}',
 				headers: { 'content-type': 'application/xml', 'if-match': '"0"' }
 			})
 		).status()
 	).toBe(415);
 	const tooMany = Array.from({ length: 501 }, (_, i) => task(`t${i}`, 'x'));
-	expect((await put(user.api, tooMany)).status()).toBe(413);
+	expect((await put(user.api, doc(tooMany))).status()).toBe(413);
+	const tooManyWorkspaces = Array.from({ length: 11 }, (_, i) => ({ id: `w${i}`, name: `W${i}` }));
+	expect((await put(user.api, doc([], tooManyWorkspaces))).status()).toBe(400);
 	expect(
 		(
 			await user.api.put('/api/tasks', {
-				data: [],
+				data: doc(),
 				headers: { origin: 'https://evil.example', 'if-match': '"0"' }
 			})
 		).status()
@@ -114,7 +124,7 @@ test('refuses to overwrite a list that changed since it was read', async ({ brow
 
 	// Tab A saves on top of version 0.
 	const a = await user.api.put('/api/tasks', {
-		data: [task('a', 'From A')],
+		data: doc([task('a', 'From A')]),
 		headers: { 'if-match': first }
 	});
 	expect(a.status()).toBe(200);
@@ -122,16 +132,16 @@ test('refuses to overwrite a list that changed since it was read', async ({ brow
 
 	// Tab B still thinks it is at version 0: refused, and A's data survives.
 	const b = await user.api.put('/api/tasks', {
-		data: [task('b', 'From B')],
+		data: doc([task('b', 'From B')]),
 		headers: { 'if-match': first }
 	});
 	expect(b.status()).toBe(412);
 	const current = await (await user.api.get('/api/tasks')).json();
-	expect(current.map((t: { title: string }) => t.title)).toEqual(['From A']);
+	expect(titles(current)).toEqual(['From A']);
 
 	// Reloading gives the new version, and saving works again.
 	const c = await user.api.put('/api/tasks', {
-		data: [task('a', 'From A'), task('b', 'From B')],
+		data: doc([task('a', 'From A'), task('b', 'From B')]),
 		headers: { 'if-match': await versionOf(user.api) }
 	});
 	expect(c.status()).toBe(200);
@@ -141,9 +151,9 @@ test('refuses to overwrite a list that changed since it was read', async ({ brow
 
 test('requires a version to save', async ({ browser }) => {
 	const user = await newUser(browser);
-	expect((await user.api.put('/api/tasks', { data: [] })).status()).toBe(428);
+	expect((await user.api.put('/api/tasks', { data: doc() })).status()).toBe(428);
 	expect(
-		(await user.api.put('/api/tasks', { data: [], headers: { 'if-match': 'abc' } })).status()
+		(await user.api.put('/api/tasks', { data: doc(), headers: { 'if-match': 'abc' } })).status()
 	).toBe(400);
 	await user.close();
 });
@@ -153,15 +163,39 @@ test('accepts weak ETags, which Cloudflare sends when it compresses responses', 
 }) => {
 	const user = await newUser(browser);
 	const saved = await user.api.put('/api/tasks', {
-		data: [task('a', 'First')],
+		data: doc([task('a', 'First')]),
 		headers: { 'if-match': 'W/"0"' }
 	});
 	expect(saved.status()).toBe(200);
 	// A stale weak version is still refused.
 	const stale = await user.api.put('/api/tasks', {
-		data: [],
+		data: doc(),
 		headers: { 'if-match': 'W/"0"' }
 	});
 	expect(stale.status()).toBe(412);
+	await user.close();
+});
+
+test('keeps workspaces and tracks where each task lives', async ({ browser }) => {
+	const user = await newUser(browser);
+	const work = { id: 'w1', name: 'Work' };
+	await put(
+		user.api,
+		doc([{ ...task('a', 'Inside'), workspaceId: 'w1' }, task('b', 'Loose')], [work])
+	);
+	const saved = await (await user.api.get('/api/tasks')).json();
+	expect(saved.workspaces).toEqual([work]);
+	expect(saved.tasks.find((t: { id: string }) => t.id === 'a').workspaceId).toBe('w1');
+	expect(saved.tasks.find((t: { id: string }) => t.id === 'b').workspaceId).toBeUndefined();
+	await user.close();
+});
+
+test('an active task pointing at a missing workspace goes back to the INBOX', async ({
+	browser
+}) => {
+	const user = await newUser(browser);
+	await put(user.api, doc([{ ...task('a', 'Orphan'), workspaceId: 'ghost' }]));
+	const saved = await (await user.api.get('/api/tasks')).json();
+	expect(saved.tasks[0].workspaceId).toBeUndefined();
 	await user.close();
 });

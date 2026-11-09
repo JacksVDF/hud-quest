@@ -27,8 +27,9 @@
 	const stats = $derived(workspaceStats(tasks));
 
 	// A workspace that does not exist (wrong link, or deleted elsewhere) goes back to the start.
+	let deleting = false;
 	$effect(() => {
-		if (taskStore.loaded && !known) void goto(resolve('/'), { replaceState: true });
+		if (taskStore.loaded && !known && !deleting) void goto(resolve('/'), { replaceState: true });
 	});
 
 	let list = $state<ReturnType<typeof TaskList>>();
@@ -45,11 +46,14 @@
 	}
 
 	async function remove() {
+		// Read before deleting: afterwards the workspace and its tasks are gone.
 		const count = tasks.length;
+		const deletedName = name;
+		deleting = true;
 		const change = taskStore.removeWorkspace(routeId);
 		await goto(resolve('/'));
 		notice.say(
-			`[!] ${name} deleted. ${count} task${count === 1 ? '' : 's'} moved to trash${
+			`[!] ${deletedName} deleted. ${count} task${count === 1 ? '' : 's'} moved to trash${
 				change.delta === 0 ? '' : `: ${change.delta} XP`
 			}.`
 		);

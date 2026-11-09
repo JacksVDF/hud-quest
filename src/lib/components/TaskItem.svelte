@@ -81,7 +81,7 @@
 			{#if onmove && workspaces.length > 0}
 				<label class="text-xs sm:max-w-sm">
 					WORKSPACE_
-					<select class="inp mt-1" bind:value={draftWorkspace}>
+					<select class="inp mt-1" bind:value={draftWorkspace} data-testid="edit-workspace">
 						<option value="">INBOX</option>
 						{#each workspaces as w (w.id)}
 							<option value={w.id}>{w.name}</option>

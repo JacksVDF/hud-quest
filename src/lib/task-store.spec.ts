@@ -731,7 +731,21 @@ describe('TaskStore workspaces', () => {
 		store.renameWorkspace(w, 'Job');
 		expect(origin(a)).toBe('Job');
 		store.removeWorkspace(w);
-		expect(origin(a)).toBe('deleted workspace');
+		expect(origin(a)).toBe('Job');
+		expect(store.trash.find((t) => t.id === a)?.originName).toBe('Job');
+	});
+
+	it('a task trashed before its workspace was deleted keeps its date and learns the name', () => {
+		const { store } = fresh();
+		const { id: w } = store.addWorkspace('Work') as { id: string };
+		const a = store.add('a', 'easy', [], w) as string;
+		vi.spyOn(Date, 'now').mockReturnValueOnce(1000);
+		store.remove(a);
+		vi.spyOn(Date, 'now').mockReturnValueOnce(9000);
+		store.removeWorkspace(w);
+		vi.restoreAllMocks();
+		expect(store.trash[0]).toMatchObject({ deletedAt: 1000, originName: 'Work' });
+		expect(store.originOf(store.trash[0])).toBe('Work');
 	});
 
 	it('restores a task to its workspace, or to the INBOX when that workspace is gone', () => {

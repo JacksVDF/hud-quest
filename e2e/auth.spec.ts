@@ -110,7 +110,7 @@ test('account tasks follow the user to another browser session', async ({ page, 
 	await expect(page.getByText('Everywhere')).toBeVisible();
 	// Saving is asynchronous: wait until the server has it before opening the second session.
 	await expect
-		.poll(async () => (await (await page.request.get('/api/tasks')).json()).length)
+		.poll(async () => (await (await page.request.get('/api/tasks')).json()).tasks.length)
 		.toBe(1);
 
 	const other = await browser.newContext({
@@ -151,6 +151,43 @@ test('imports guest tasks into the account once, then offers nothing more', asyn
 	await expect(page.getByText('No tasks yet')).toBeVisible();
 });
 
+test('imports guest workspaces with their tasks', async ({ page }) => {
+	await page.goto('/');
+	await expect(page.getByText('loading…')).toHaveCount(0);
+	await page.getByLabel('NEW_WORKSPACE_').fill('Garden');
+	await page.getByRole('button', { name: /^CREATE >/ }).click();
+	await page.getByTestId('workspace-card').filter({ hasText: 'Garden' }).click();
+	await expect(page.getByTestId('workspace-name')).toHaveText('Garden');
+	await page.getByLabel('NEW_TASK_').fill('Plant tomatoes');
+	await page.getByRole('button', { name: /^ADD >/ }).click();
+	await expect(page.getByText('Plant tomatoes')).toBeVisible();
+	await page.getByRole('link', { name: /ALL WORKSPACES/ }).click();
+
+	await signUp(page, uniqueEmail());
+	await expect(page.getByTestId('import-prompt')).toContainText('1 task and 1 workspace');
+	await page.getByRole('button', { name: /IMPORT/ }).click();
+	await expect(page.getByText('Imported 1 task and 1 workspace into your account.')).toBeVisible();
+	const garden = page.getByTestId('workspace-card').filter({ hasText: 'Garden' });
+	await expect(garden).toContainText('1 open');
+
+	// Saved in the account: it is still there after a reload, inside its workspace.
+	await page.reload();
+	await page.getByTestId('workspace-card').filter({ hasText: 'Garden' }).click();
+	await expect(page.getByText('Plant tomatoes')).toBeVisible();
+});
+
+test('workspaces of an account are not mixed with the guest ones', async ({ page }) => {
+	await page.goto('/');
+	await expect(page.getByText('loading…')).toHaveCount(0);
+	await page.getByLabel('NEW_WORKSPACE_').fill('Guest space');
+	await page.getByRole('button', { name: /^CREATE >/ }).click();
+	await signUp(page, uniqueEmail());
+	await page.getByRole('button', { name: 'NOT NOW' }).click();
+	await expect(page.getByTestId('workspace-card')).toHaveCount(1); // only INBOX
+	await page.getByRole('button', { name: 'LOGOUT' }).click();
+	await expect(page.getByTestId('workspace-card').filter({ hasText: 'Guest space' })).toBeVisible();
+});
+
 test('keeps guest tasks in the browser when the import is skipped', async ({ page }) => {
 	await page.goto('/');
 	await expect(page.getByText('loading…')).toHaveCount(0);
@@ -182,7 +219,7 @@ test('a second tab that saved first makes the first tab stop and offer a reload'
 	await tabB.getByRole('button', { name: /^ADD >/ }).click();
 	await expect(tabB.getByText('From B')).toBeVisible();
 	await expect
-		.poll(async () => (await (await tabB.request.get('/api/tasks')).json()).length)
+		.poll(async () => (await (await tabB.request.get('/api/tasks')).json()).tasks.length)
 		.toBe(1);
 
 	// Tab A still has version 0: its save is refused and nothing of B is lost.
@@ -199,7 +236,7 @@ test('a second tab that saved first makes the first tab stop and offer a reload'
 	await tabA.getByLabel('NEW_TASK_').fill('From A again');
 	await tabA.getByRole('button', { name: /^ADD >/ }).click();
 	await expect
-		.poll(async () => (await (await tabA.request.get('/api/tasks')).json()).length)
+		.poll(async () => (await (await tabA.request.get('/api/tasks')).json()).tasks.length)
 		.toBe(2);
 	await context.close();
 });
@@ -213,7 +250,7 @@ test('deletes the account after confirming the password, with all its data', asy
 	await page.getByLabel('NEW_TASK_').fill('Doomed task');
 	await page.getByRole('button', { name: /^ADD >/ }).click();
 	await expect
-		.poll(async () => (await (await page.request.get('/api/tasks')).json()).length)
+		.poll(async () => (await (await page.request.get('/api/tasks')).json()).tasks.length)
 		.toBe(1);
 
 	await page.getByTestId('account-email').click();

@@ -53,7 +53,7 @@
 			{#if workspaces.length > 0}
 				<label class="text-xs sm:w-48">
 					WORKSPACE_
-					<select class="inp mt-1" bind:value={workspaceId}>
+					<select class="inp mt-1" bind:value={workspaceId} data-testid="new-task-workspace">
 						<option value="">INBOX</option>
 						{#each workspaces as w (w.id)}
 							<option value={w.id}>{w.name}</option>

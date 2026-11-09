@@ -51,8 +51,10 @@ try {
 	const first = await call('/api/tasks');
 	const etag = first.headers.get('etag') ?? '';
 	check('tasks load with a version', first.status === 200 && etag !== '', `status ${first.status}`);
-	check('new account starts empty', JSON.stringify(await first.json()) === '[]');
+	const empty = await first.json();
+	check('new account starts empty', empty.tasks?.length === 0 && empty.workspaces?.length === 0);
 
+	const workspace = { id: 'smoke-w', name: 'Smoke space' };
 	const task = {
 		id: 'smoke-1',
 		title: 'Smoke task',
@@ -60,24 +62,30 @@ try {
 		done: false,
 		tags: [],
 		items: [],
-		notes: ''
+		notes: '',
+		workspaceId: 'smoke-w'
 	};
 	const put = await call('/api/tasks', {
 		method: 'PUT',
-		body: JSON.stringify([task]),
+		body: JSON.stringify({ workspaces: [workspace], tasks: [task] }),
 		headers: { 'if-match': etag }
 	});
 	check('tasks save with the version the server sent', put.ok, `status ${put.status}`);
 
 	const stale = await call('/api/tasks', {
 		method: 'PUT',
-		body: '[]',
+		body: JSON.stringify({ workspaces: [], tasks: [] }),
 		headers: { 'if-match': etag }
 	});
 	check('a stale version is refused', stale.status === 412, `status ${stale.status}`);
 
 	const back = await (await call('/api/tasks')).json();
-	check('saved task comes back', back.length === 1 && back[0].title === 'Smoke task');
+	check(
+		'saved workspace and task come back',
+		back.workspaces?.[0]?.name === 'Smoke space' &&
+			back.tasks?.length === 1 &&
+			back.tasks[0].workspaceId === 'smoke-w'
+	);
 } catch (e) {
 	check('smoke test ran without errors', false, String(e));
 } finally {
