@@ -257,6 +257,16 @@ describe('toTasks (untrusted input)', () => {
 		expect(result?.[0]).toMatchObject({ tags: ['a', 'b', 'c'], notes: '' });
 		expect(result?.[1].notes).toHaveLength(1000);
 	});
+
+	it('keeps a valid workspaceId and drops a bad one', () => {
+		const result = toTasks([
+			task({ id: 'a', workspaceId: 'w1' }),
+			{ ...task({ id: 'b' }), workspaceId: 7 },
+			task({ id: 'c', workspaceId: '' }),
+			task({ id: 'd', workspaceId: 'x'.repeat(100) })
+		]);
+		expect(result?.map((t) => t.workspaceId)).toEqual(['w1', undefined, undefined, undefined]);
+	});
 });
 
 describe('trash expiry', () => {

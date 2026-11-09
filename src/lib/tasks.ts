@@ -19,12 +19,15 @@ export interface Task {
 	notes: string;
 	/** When the task was moved to the trash (ms since epoch). Absent for active tasks. */
 	deletedAt?: number;
+	/** The workspace it belongs to. Absent means INBOX; a trashed task keeps its origin. */
+	workspaceId?: string;
 }
 
 export const STORAGE_KEY = 'hud-quest-todo:tasks';
 export const MAX_TAGS = 3;
 export const MAX_TAG_LENGTH = 20;
 export const MAX_NOTES_LENGTH = 1000;
+export const MAX_ID_LENGTH = 64;
 /** Trashed tasks are removed for good after this many days. */
 export const TRASH_DAYS = 30;
 
@@ -162,6 +165,9 @@ function toTask(value: unknown): Task | null {
 
 	const task: Task = { id: t.id, title: t.title, complexity, done: t.done, tags, items, notes };
 	if (typeof t.deletedAt === 'number' && Number.isFinite(t.deletedAt)) task.deletedAt = t.deletedAt;
+	if (typeof t.workspaceId === 'string' && t.workspaceId && t.workspaceId.length <= MAX_ID_LENGTH) {
+		task.workspaceId = t.workspaceId;
+	}
 	task.done = reconcileDone(task);
 	return task;
 }
