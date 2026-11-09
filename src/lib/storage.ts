@@ -1,30 +1,31 @@
-import { STORAGE_KEY, parseTasks, type Task } from './tasks';
+import { STORAGE_KEY } from './tasks';
+import { parseData, type Data } from './workspaces';
 
-/** Where the task list is persisted. Guests use the browser, signed-in users use the API. */
+/** Where the workspaces and tasks are persisted. Guests use the browser, signed-in users the API. */
 export interface TaskStorage {
-	load(): Task[] | Promise<Task[]>;
+	load(): Data | Promise<Data>;
 	/** May be async; a rejected promise means the save failed. */
-	save(tasks: Task[]): void | Promise<void>;
+	save(data: Data): void | Promise<void>;
 }
 
-/** The guest list kept in this browser. Only call on the client. */
-export function readGuestTasks(): Task[] {
-	return parseTasks(localStorage.getItem(STORAGE_KEY));
+/** What the guest kept in this browser (an old plain task list reads as INBOX tasks). Client only. */
+export function readGuestData(): Data {
+	return parseData(localStorage.getItem(STORAGE_KEY));
 }
 
-export function clearGuestTasks() {
+export function clearGuestData() {
 	localStorage.removeItem(STORAGE_KEY);
 }
 
 /** Browser storage for guests. `localStorage` is read lazily, so it is safe to create on the server. */
 export function createLocalStorage(): TaskStorage {
 	return {
-		load: readGuestTasks,
-		save: (tasks) => localStorage.setItem(STORAGE_KEY, JSON.stringify(tasks))
+		load: readGuestData,
+		save: (data) => localStorage.setItem(STORAGE_KEY, JSON.stringify(data))
 	};
 }
 
-/** The account list was saved from somewhere else since this tab loaded it. */
+/** The account data was saved from somewhere else since this tab loaded it. */
 export class ConflictError extends Error {
 	constructor() {
 		super('Tasks changed somewhere else');
@@ -42,7 +43,7 @@ export function versionOf(res: Response): number {
 	return n;
 }
 
-/** The signed-in user's tasks, kept in D1 through /api/tasks. */
+/** The signed-in user's workspaces and tasks, kept in D1 through /api/tasks. */
 export function createRemoteStorage(fetcher: typeof fetch = fetch): TaskStorage {
 	// Saves are sent one after another, each based on the version the previous one produced.
 	let queue: Promise<unknown> = Promise.resolve();
@@ -53,10 +54,10 @@ export function createRemoteStorage(fetcher: typeof fetch = fetch): TaskStorage 
 			const res = await fetcher('/api/tasks');
 			if (!res.ok) throw new Error(`Could not load tasks (${res.status})`);
 			version = versionOf(res);
-			return parseTasks(JSON.stringify(await res.json()));
+			return parseData(await res.text());
 		},
-		save(tasks) {
-			const body = JSON.stringify(tasks);
+		save(data) {
+			const body = JSON.stringify(data);
 			const send = async () => {
 				if (version === null) throw new Error('Tasks were not loaded');
 				const res = await fetcher('/api/tasks', {

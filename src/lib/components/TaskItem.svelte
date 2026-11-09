@@ -6,19 +6,25 @@
 	import { MOTION, ms } from '#lib/motion.ts';
 	import { MAX_NOTES_LENGTH, canMarkDone, taskXp, type Task } from '#lib/tasks.ts';
 	import { XP_BY_COMPLEXITY } from '#lib/xp.ts';
+	import type { Workspace } from '#lib/workspaces.ts';
 
 	let {
 		task,
+		workspaces = [],
 		ontoggle,
 		onsave,
+		onmove,
 		onremove,
 		onadditem,
 		ontoggleitem,
 		onremoveitem
 	}: {
 		task: Task;
+		/** Where the task can be moved to (the INBOX is always an option). */
+		workspaces?: Workspace[];
 		ontoggle: (id: string) => void;
 		onsave: (id: string, patch: { title?: string; tags?: string[]; notes?: string }) => void;
+		onmove?: (id: string, workspaceId: string | undefined) => void;
 		onremove: (id: string) => void;
 		onadditem: (taskId: string, title: string) => void;
 		ontoggleitem: (taskId: string, itemId: string) => void;
@@ -30,6 +36,8 @@
 	let draftTitle = $state('');
 	let draftTags = $state<string[]>([]);
 	let draftNotes = $state('');
+	/** '' is the INBOX. */
+	let draftWorkspace = $state('');
 
 	const isProject = $derived(task.complexity === 'hard');
 	const hasPanel = $derived(task.complexity !== 'easy');
@@ -43,6 +51,7 @@
 	function startEdit() {
 		draftTitle = task.title;
 		draftTags = [...task.tags];
+		draftWorkspace = task.workspaceId ?? '';
 		editing = true;
 	}
 
@@ -51,6 +60,7 @@
 		if (!draftTitle.trim()) return;
 		onsave(task.id, { title: draftTitle, tags: draftTags });
 		editing = false;
+		if (draftWorkspace !== (task.workspaceId ?? '')) onmove?.(task.id, draftWorkspace || undefined);
 	}
 
 	function openPanel() {
@@ -68,6 +78,17 @@
 		<form class="flex flex-col gap-3" onsubmit={save}>
 			<input class="inp" bind:value={draftTitle} maxlength="120" required aria-label="Task title" />
 			<TagInput bind:tags={draftTags} />
+			{#if onmove && workspaces.length > 0}
+				<label class="text-xs sm:max-w-sm">
+					WORKSPACE_
+					<select class="inp mt-1" bind:value={draftWorkspace}>
+						<option value="">INBOX</option>
+						{#each workspaces as w (w.id)}
+							<option value={w.id}>{w.name}</option>
+						{/each}
+					</select>
+				</label>
+			{/if}
 			<div class="flex gap-2">
 				<button type="submit" class="btn" disabled={!draftTitle.trim()}>SAVE</button>
 				<button type="button" class="btn o" onclick={() => (editing = false)}>CANCEL</button>

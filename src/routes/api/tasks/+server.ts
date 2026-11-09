@@ -1,7 +1,7 @@
 import { error, json } from '@sveltejs/kit';
 import { env } from 'cloudflare:workers';
-import { getTasks, MAX_BODY_BYTES, MAX_TASKS, saveTasks } from '#lib/server/db.ts';
-import { toTasks } from '#lib/tasks.ts';
+import { getData, MAX_BODY_BYTES, MAX_TASKS, saveData } from '#lib/server/db.ts';
+import { toData } from '#lib/workspaces.ts';
 import type { RequestHandler } from './$types';
 
 // Not part of the prerendered site: it needs the session and the database.
@@ -26,13 +26,13 @@ function parseIfMatch(value: string | null): number | null {
 
 export const GET: RequestHandler = async ({ locals }) => {
 	const userId = requireUserId(locals);
-	const { tasks, version } = await getTasks(env.DB, userId);
-	return json(tasks, { headers: headersFor(version) });
+	const { data, version } = await getData(env.DB, userId);
+	return json(data, { headers: headersFor(version) });
 };
 
 /**
- * Replaces the user's whole task list. `If-Match` must carry the version the client last
- * saw (the ETag of its GET or previous PUT); if the list changed since, the answer is 412
+ * Replaces the user's whole data (workspaces and tasks). `If-Match` must carry the version the client last
+ * saw (the ETag of its GET or previous PUT); if the data changed since, the answer is 412
  * and nothing is overwritten.
  */
 export const PUT: RequestHandler = async ({ request, locals, url }) => {
@@ -60,12 +60,21 @@ export const PUT: RequestHandler = async ({ request, locals, url }) => {
 		error(400, 'Invalid JSON.');
 	}
 
-	const tasks = toTasks(body);
-	if (!tasks) error(400, 'Expected a list of tasks.');
-	if ((body as unknown[]).length !== tasks.length) error(400, 'The list has invalid tasks.');
-	if (tasks.length > MAX_TASKS) error(413, `At most ${MAX_TASKS} tasks.`);
+	// Only the document form is accepted here; the old plain list is a read-only format.
+	if (typeof body !== 'object' || body === null || Array.isArray(body)) {
+		error(400, 'Expected { workspaces, tasks }.');
+	}
+	const sent = body as { workspaces?: unknown; tasks?: unknown };
+	const data = toData(body);
+	if (!data) error(400, 'Expected a list of tasks.');
+	const sentWorkspaces = Array.isArray(sent.workspaces) ? sent.workspaces.length : 0;
+	if (sentWorkspaces !== data.workspaces.length) error(400, 'The data has invalid workspaces.');
+	if ((sent.tasks as unknown[]).length !== data.tasks.length) {
+		error(400, 'The data has invalid tasks.');
+	}
+	if (data.tasks.length > MAX_TASKS) error(413, `At most ${MAX_TASKS} tasks.`);
 
-	const version = await saveTasks(env.DB, userId, tasks, expected);
-	if (version === null) error(412, 'Your tasks changed somewhere else. Reload them.');
-	return json(tasks, { headers: headersFor(version) });
+	const version = await saveData(env.DB, userId, data, expected);
+	if (version === null) error(412, 'Your data changed somewhere else. Reload it.');
+	return json(data, { headers: headersFor(version) });
 };

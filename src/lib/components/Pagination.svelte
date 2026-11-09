@@ -1,11 +1,15 @@
 <script lang="ts">
-	let { page = $bindable(), count }: { page: number; count: number } = $props();
+	let {
+		page = $bindable(),
+		count,
+		label = 'Pagination'
+	}: { page: number; count: number; label?: string } = $props();
 
 	const pages = $derived(Array.from({ length: count }, (_, i) => i + 1));
 </script>
 
 {#if count > 1}
-	<nav aria-label="Pagination" class="flex flex-wrap items-center gap-2">
+	<nav aria-label={label} class="flex flex-wrap items-center gap-2">
 		<button
 			type="button"
 			class="btn o sm min-h-11 min-w-11 justify-center px-0"

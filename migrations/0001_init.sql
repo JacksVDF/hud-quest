@@ -1,4 +1,4 @@
--- Better Auth tables (email + password). Generated from the library's own schema
+-- Initial schema. Better Auth tables (email + password). Generated from the library's own schema
 -- (better-auth 1.7.18, rateLimit.storage = 'database'). Re-generate if the library or its options change.
 
 create table "user" (
@@ -57,3 +57,14 @@ create table "rateLimit" (
 create index "session_userId_idx" on "session" ("userId");
 create index "account_userId_idx" on "account" ("userId");
 create index "verification_identifier_idx" on "verification" ("identifier");
+
+-- One row per user holding all their data as JSON: { workspaces, tasks } (same shape the app
+-- keeps in localStorage). Every query must filter by user_id; see src/lib/server/db.ts.
+-- `version` is for optimistic concurrency: every save says which version it was based on, and
+-- the server refuses it if another tab or device saved in the meantime.
+create table "user_data" (
+  "user_id" text not null primary key references "user" ("id") on delete cascade,
+  "data" text not null,
+  "updated_at" integer not null,
+  "version" integer not null default 1
+);
