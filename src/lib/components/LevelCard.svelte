@@ -1,11 +1,21 @@
 <script lang="ts">
 	import { Tween } from 'svelte/motion';
 	import { cubicOut } from 'svelte/easing';
+	import { resolve } from '$app/paths';
 	import ProgressBar from './ProgressBar.svelte';
 	import { ms } from '#lib/motion.ts';
 	import { rankForLevel, type LevelInfo } from '#lib/xp.ts';
 
-	let { info, totalXp }: { info: LevelInfo; totalXp: number } = $props();
+	let {
+		info,
+		totalXp,
+		streak
+	}: {
+		info: LevelInfo;
+		totalXp: number;
+		/** Days in a row with a completed task. Leave out to hide the counter. */
+		streak?: number;
+	} = $props();
 
 	// Total XP counts up/down to its new value instead of jumping.
 	const shownXp = Tween.of(() => totalXp, { duration: ms(450), easing: cubicOut });
@@ -26,6 +36,16 @@
 			{/key}
 			<div>XP {info.xpInLevel}/{info.xpNeeded}</div>
 			<div>TOTAL {Math.round(shownXp.current)}</div>
+			{#if streak !== undefined}
+				<a
+					class="mt-1 inline-block underline"
+					href={resolve('/stats')}
+					data-testid="streak"
+					aria-label={`Streak: ${streak} ${streak === 1 ? 'day' : 'days'}. Open statistics`}
+				>
+					STREAK {streak}D &gt;
+				</a>
+			{/if}
 		</div>
 	</div>
 	<div class="mt-4">

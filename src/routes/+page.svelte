@@ -9,6 +9,7 @@
 	import Trash from '#lib/components/Trash.svelte';
 	import WorkspaceCard from '#lib/components/WorkspaceCard.svelte';
 	import WorkspaceForm from '#lib/components/WorkspaceForm.svelte';
+	import { currentStreak } from '#lib/activity.ts';
 	import { app } from '#lib/app.svelte.ts';
 	import { notice } from '#lib/notice.svelte.ts';
 	import { taskStore } from '#lib/task-store.svelte.ts';
@@ -72,7 +73,11 @@
 	<main class="mt-8 flex flex-col gap-8">
 		<h1 class="h text-4xl sm:text-5xl">_TASKS;</h1>
 
-		<LevelCard info={taskStore.levelInfo} totalXp={taskStore.xp} />
+		<LevelCard
+			info={taskStore.levelInfo}
+			totalXp={taskStore.xp}
+			streak={taskStore.loaded ? currentStreak(taskStore.activity, clock.today) : undefined}
+		/>
 
 		<TaskForm disabled={!taskStore.loaded} workspaces={taskStore.workspaces} onadd={addTask} />
 

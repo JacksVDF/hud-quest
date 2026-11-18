@@ -10,6 +10,7 @@
 	import TaskForm from '#lib/components/TaskForm.svelte';
 	import TaskList from '#lib/components/TaskList.svelte';
 	import WorkspaceHeader from '#lib/components/WorkspaceHeader.svelte';
+	import { currentStreak } from '#lib/activity.ts';
 	import { app } from '#lib/app.svelte.ts';
 	import { notice } from '#lib/notice.svelte.ts';
 	import { taskStore } from '#lib/task-store.svelte.ts';
@@ -97,7 +98,11 @@
 			<p class="text-sm">&gt; loading…</p>
 		{/if}
 
-		<LevelCard info={taskStore.levelInfo} totalXp={taskStore.xp} />
+		<LevelCard
+			info={taskStore.levelInfo}
+			totalXp={taskStore.xp}
+			streak={taskStore.loaded ? currentStreak(taskStore.activity, clock.today) : undefined}
+		/>
 
 		{#if known}
 			<TaskForm disabled={!taskStore.loaded} onadd={addTask} />
