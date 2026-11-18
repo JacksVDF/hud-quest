@@ -17,10 +17,19 @@
 	import { session } from '#lib/session.svelte.ts';
 	import { taskStore } from '#lib/task-store.svelte.ts';
 	import { clock } from '#lib/today.svelte.ts';
-	import { canMarkDone } from '#lib/tasks.ts';
+	import { canMarkDone, type Task } from '#lib/tasks.ts';
 
 	/** The month with the tasks that have a due date, and the tasks of the day that was picked. */
-	let { onadd }: { onadd: (day: string) => void } = $props();
+	let {
+		onadd,
+		tasks = undefined
+	}: {
+		onadd: (day: string) => void;
+		/** Only these tasks are shown (a workspace). Leave out to show every task. */
+		tasks?: Task[];
+	} = $props();
+
+	const shown = $derived(tasks ?? taskStore.tasks);
 
 	let month = $state(monthOf(clock.today));
 	/** Today is picked at first; picking the same day again clears it. */
@@ -34,8 +43,8 @@
 
 	const grid = $derived(monthGrid(month));
 	const weeks = $derived(Array.from({ length: 6 }, (_, i) => grid.slice(i * 7, i * 7 + 7)));
-	const tally = $derived(tallyByDay(taskStore.tasks, clock.today));
-	const dayTasks = $derived(selected ? tasksOn(taskStore.tasks, selected) : []);
+	const tally = $derived(tallyByDay(shown, clock.today));
+	const dayTasks = $derived(selected ? tasksOn(shown, selected) : []);
 	// Only one day takes part in the tab order; the arrow keys move between the others.
 	const tabStop = $derived(
 		[focused, selected, clock.today].find((d) => d && grid.includes(d)) ?? `${month}-01`

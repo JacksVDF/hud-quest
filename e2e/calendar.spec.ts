@@ -234,3 +234,72 @@ test('a day of the next month in the grid takes you to that month when clicked',
 	await expect(title).not.toHaveText(first!);
 	await expect(cell(page, last!).first()).toHaveAttribute('aria-pressed', 'true');
 });
+
+/** Opens a workspace made on the spot (or the INBOX with no name) and waits for its page. */
+async function openWorkspace(page: Page, name?: string) {
+	if (name) {
+		await page.getByLabel('NEW_WORKSPACE_').fill(name);
+		await page.getByRole('button', { name: /^CREATE >/ }).click();
+	}
+	await page
+		.getByTestId('workspace-card')
+		.filter({ hasText: name ?? 'INBOX' })
+		.click();
+	await expect(page).toHaveURL(/\/w\//);
+	await expect(page.getByTestId('workspace-name')).toHaveText(name ?? 'INBOX');
+}
+
+test('a workspace calendar shows only the tasks of that workspace', async ({ page }) => {
+	const today = await day(page, 0);
+	await addTask(page, 'in the inbox', today);
+	await page.getByLabel('NEW_WORKSPACE_').fill('Work');
+	await page.getByRole('button', { name: /^CREATE >/ }).click();
+	await page.getByTestId('new-task-workspace').selectOption({ label: 'Work' });
+	await addTask(page, 'in work', today);
+
+	// The home page shows both.
+	await expect(cell(page, today)).toHaveAttribute('data-mark', '■2');
+	await expect(panel(page).getByTestId('day-task')).toHaveCount(2);
+
+	await openWorkspace(page, 'Work');
+	await expect(page.getByTestId('calendar')).toBeVisible();
+	await expect(cell(page, today)).toHaveAttribute('data-mark', '■1');
+	await expect(panel(page)).toContainText('in work');
+	await expect(panel(page)).not.toContainText('in the inbox');
+	await expect(panel(page).getByTestId('day-task-place')).toHaveText('Work');
+
+	// And the INBOX page only its own.
+	await page.getByRole('link', { name: /ALL WORKSPACES/ }).click();
+	await openWorkspace(page);
+	await expect(cell(page, today)).toHaveAttribute('data-mark', '■1');
+	await expect(panel(page)).toContainText('in the inbox');
+	await expect(panel(page)).not.toContainText('in work');
+});
+
+test('+ ADD inside a workspace makes the task in that workspace', async ({ page }) => {
+	await openWorkspace(page, 'Home');
+	const target = await sameMonthDay(page, 3);
+	await cell(page, target).click();
+	await panel(page)
+		.getByRole('button', { name: /\+ ADD/ })
+		.click();
+	await expect(page.getByTestId('due-date').first()).toHaveValue(target);
+	await page.getByLabel('NEW_TASK_').fill('planned here');
+	await page.getByRole('button', { name: /^ADD >/ }).click();
+	await expect(cell(page, target)).toHaveAttribute('data-mark', '■1');
+	await expect(panel(page).getByTestId('day-task-place')).toHaveText('Home');
+
+	// It is not in the INBOX.
+	await page.getByRole('link', { name: /ALL WORKSPACES/ }).click();
+	await openWorkspace(page);
+	await expect(cell(page, target)).toHaveAttribute('data-mark', '');
+});
+
+test('each workspace page starts on today, with its own month', async ({ page }) => {
+	await openWorkspace(page, 'Fresh');
+	await page.getByRole('button', { name: 'Next month' }).click();
+	const moved = await page.getByTestId('month-title').textContent();
+	await page.getByRole('link', { name: /ALL WORKSPACES/ }).click();
+	await expect(page.getByTestId('month-title')).not.toHaveText(moved!);
+	await expect(cell(page, await day(page, 0))).toHaveAttribute('aria-pressed', 'true');
+});

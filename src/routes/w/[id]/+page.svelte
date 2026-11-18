@@ -5,6 +5,7 @@
 	import { resolve } from '$app/paths';
 	import AccountMenu from '#lib/components/AccountMenu.svelte';
 	import AppHeader from '#lib/components/AppHeader.svelte';
+	import Calendar from '#lib/components/Calendar.svelte';
 	import LevelCard from '#lib/components/LevelCard.svelte';
 	import Notices from '#lib/components/Notices.svelte';
 	import TaskForm from '#lib/components/TaskForm.svelte';
@@ -39,6 +40,7 @@
 	});
 
 	let list = $state<ReturnType<typeof TaskList>>();
+	let form = $state<ReturnType<typeof TaskForm>>();
 
 	function addTask(
 		title: string,
@@ -105,7 +107,11 @@
 		/>
 
 		{#if known}
-			<TaskForm disabled={!taskStore.loaded} onadd={addTask} />
+			<!-- Its own state per workspace: the picked day and month do not carry over. -->
+			{#key routeId}
+				<Calendar {tasks} onadd={(day) => form?.prefill(day)} />
+			{/key}
+			<TaskForm bind:this={form} disabled={!taskStore.loaded} onadd={addTask} />
 		{/if}
 
 		<Notices />
