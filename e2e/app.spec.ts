@@ -149,7 +149,12 @@ test('a new task opens the page where it landed, unless a filter hides it', asyn
 
 test('the ADD button lines up with the inputs on desktop', async ({ page }) => {
 	await page.setViewportSize({ width: 1280, height: 900 });
-	const box = async (locator: Locator) => (await locator.boundingBox())!;
+	// Position in the document, so scrolling the form into view while typing does not matter.
+	const box = (locator: Locator) =>
+		locator.evaluate((n) => {
+			const r = n.getBoundingClientRect();
+			return { x: r.x + scrollX, y: r.y + scrollY, width: r.width, height: r.height };
+		});
 	const tagInput = page.getByLabel('TAGS_');
 	const add = page.getByRole('button', { name: /^ADD >/ });
 	const title = page.getByLabel('NEW_TASK_');
@@ -328,7 +333,7 @@ for (const [label, size] of [
 		const missions = page.getByRole('heading', { name: /_INBOX/ });
 		// Position in the document (not the window), so scrolling does not matter.
 		const top = (el: Locator) => el.evaluate((n) => n.getBoundingClientRect().top + scrollY);
-		const slot = page.locator('[aria-live="polite"]').first();
+		const slot = page.getByTestId('notices');
 		const before = {
 			missions: await top(missions),
 			slot: (await slot.boundingBox())!.height

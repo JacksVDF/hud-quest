@@ -1,0 +1,266 @@
+<script lang="ts">
+	import { tick } from 'svelte';
+	import {
+		WEEKDAYS,
+		canShift,
+		cellMark,
+		describeDay,
+		monthGrid,
+		monthOf,
+		monthTitle,
+		shiftMonth,
+		tallyByDay,
+		tasksOn
+	} from '#lib/calendar.ts';
+	import { addDays, formatDay, isDayKey } from '#lib/dates.ts';
+	import { notice } from '#lib/notice.svelte.ts';
+	import { session } from '#lib/session.svelte.ts';
+	import { taskStore } from '#lib/task-store.svelte.ts';
+	import { clock } from '#lib/today.svelte.ts';
+	import { canMarkDone } from '#lib/tasks.ts';
+
+	/** The month with the tasks that have a due date, and the tasks of the day that was picked. */
+	let { onadd }: { onadd: (day: string) => void } = $props();
+
+	let month = $state(monthOf(clock.today));
+	/** Today is picked at first; picking the same day again clears it. */
+	let selected = $state<string | null>(clock.today);
+	/** The day that has the keyboard focus, so the arrow keys know where to start. */
+	let focused = $state<string | null>(null);
+	/** The task being dragged and the day it is over. */
+	let dragging = $state<string | null>(null);
+	let over = $state<string | null>(null);
+	let gridEl = $state<HTMLElement>();
+
+	const grid = $derived(monthGrid(month));
+	const weeks = $derived(Array.from({ length: 6 }, (_, i) => grid.slice(i * 7, i * 7 + 7)));
+	const tally = $derived(tallyByDay(taskStore.tasks, clock.today));
+	const dayTasks = $derived(selected ? tasksOn(taskStore.tasks, selected) : []);
+	// Only one day takes part in the tab order; the arrow keys move between the others.
+	const tabStop = $derived(
+		[focused, selected, clock.today].find((d) => d && grid.includes(d)) ?? `${month}-01`
+	);
+
+	function pick(day: string) {
+		selected = selected === day ? null : day;
+		// A day shown from the next or previous month brings that month with it.
+		if (monthOf(day) !== month) month = monthOf(day);
+	}
+
+	function go(n: number) {
+		if (canShift(month, n)) month = shiftMonth(month, n);
+	}
+
+	function goToday() {
+		month = monthOf(clock.today);
+		selected = clock.today;
+	}
+
+	async function keys(e: KeyboardEvent) {
+		const step = { ArrowLeft: -1, ArrowRight: 1, ArrowUp: -7, ArrowDown: 7 }[e.key];
+		const day = (e.target as HTMLElement).dataset.day;
+		if (step === undefined || !day) return;
+		e.preventDefault();
+		const target = addDays(day, step);
+		if (!grid.includes(target)) {
+			// Past the edge of the grid: show the neighbouring month and keep going.
+			month = monthOf(target);
+			await tick();
+		}
+		gridEl?.querySelector<HTMLElement>(`[data-day="${target}"]`)?.focus();
+	}
+
+	function toggle(id: string) {
+		const result = taskStore.toggle(id);
+		if (result) notice.announce(result, 'Task completed', 'Task reopened');
+	}
+
+	/** Gives an open task another due day. Repeats and everything else stay as they were. */
+	function reschedule(id: string, day: string) {
+		const task = taskStore.tasks.find((t) => t.id === id);
+		if (!task || task.done || !isDayKey(day) || day === task.dueDate) return;
+		taskStore.update(id, { dueDate: day });
+		notice.say(`[✓] Moved to ${formatDay(day, clock.today)}.`);
+	}
+
+	function changeDay(e: Event & { currentTarget: HTMLInputElement }, id: string, current?: string) {
+		const input = e.currentTarget;
+		if (!isDayKey(input.value)) input.value = current ?? '';
+		else reschedule(id, input.value);
+	}
+
+	function drop(e: DragEvent, day: string) {
+		e.preventDefault();
+		const id = dragging;
+		dragging = over = null;
+		if (id) reschedule(id, day);
+	}
+</script>
+
+<section aria-labelledby="calendar-title" class="flex flex-col gap-4" data-testid="calendar">
+	<h2 id="calendar-title" class="h text-2xl">_CALENDAR;</h2>
+
+	<div class="brk flex flex-col gap-3 p-4">
+		<div class="flex items-center justify-between gap-2">
+			<button
+				type="button"
+				class="btn o sm"
+				aria-label="Previous month"
+				disabled={!canShift(month, -1)}
+				onclick={() => go(-1)}>&lt;</button
+			>
+			<div class="flex flex-wrap items-center justify-center gap-2">
+				<span class="h text-lg" aria-live="polite" data-testid="month-title">
+					{monthTitle(month)}
+				</span>
+				<button type="button" class="btn o sm" onclick={goToday} data-testid="calendar-today">
+					TODAY
+				</button>
+			</div>
+			<button
+				type="button"
+				class="btn o sm"
+				aria-label="Next month"
+				disabled={!canShift(month, 1)}
+				onclick={() => go(1)}>&gt;</button
+			>
+		</div>
+
+		<table class="w-full table-fixed border-separate border-spacing-1" bind:this={gridEl}>
+			<thead>
+				<tr>
+					{#each WEEKDAYS as name (name)}
+						<th scope="col" class="pb-1 text-xs font-normal">{name}</th>
+					{/each}
+				</tr>
+			</thead>
+			<tbody>
+				{#each weeks as week, w (w)}
+					<tr>
+						{#each week as day, d (d)}
+							{@const mark = cellMark(tally[day])}
+							<td>
+								<button
+									type="button"
+									data-testid="day"
+									data-day={day}
+									data-mark={mark}
+									aria-pressed={selected === day}
+									aria-label={describeDay(day, tally[day]) +
+										(day === clock.today ? ' (today)' : '')}
+									tabindex={day === tabStop ? 0 : -1}
+									class="flex h-12 w-full flex-col items-start justify-between border-2 p-1 text-left text-xs sm:h-14 {selected ===
+									day
+										? 'border-f bg-f text-b'
+										: tally[day]
+											? 'border-f'
+											: 'border-f/25'} {monthOf(day) !== month && selected !== day
+										? 'opacity-60'
+										: ''} {day === clock.today ? 'gline' : ''} {over === day
+										? 'outline-2 outline-offset-1 outline-dashed'
+										: ''}"
+									onclick={() => pick(day)}
+									onkeydown={keys}
+									onfocus={() => (focused = day)}
+									ondragover={(e) => {
+										if (!dragging) return;
+										e.preventDefault();
+										over = day;
+									}}
+									ondragleave={() => (over = over === day ? null : over)}
+									ondrop={(e) => drop(e, day)}
+								>
+									<span class="text-sm font-bold">{Number(day.slice(8))}</span>
+									<span aria-hidden="true">{mark}</span>
+								</button>
+							</td>
+						{/each}
+					</tr>
+				{/each}
+			</tbody>
+		</table>
+	</div>
+
+	<div class="flex flex-col gap-3" aria-live="polite" data-testid="day-panel">
+		{#if selected}
+			<div class="flex flex-wrap items-center justify-between gap-3">
+				<h3 class="h text-lg" data-testid="day-title">
+					{formatDay(selected, clock.today)}{selected === clock.today ? ' · TODAY' : ''}
+					<span class="text-sm font-normal">
+						{dayTasks.length}
+						{dayTasks.length === 1 ? 'task' : 'tasks'}
+					</span>
+				</h3>
+				<button type="button" class="btn g sm" onclick={() => onadd(selected!)}>+ ADD &gt;</button>
+			</div>
+
+			{#if session.blocked}
+				<p class="text-sm">&gt; Offline. Reconnect to see your tasks.</p>
+			{:else if !taskStore.loaded}
+				<p class="text-sm">&gt; loading…</p>
+			{:else if dayTasks.length === 0}
+				<p class="text-sm">&gt; Nothing due on this day.</p>
+			{:else}
+				<ul class="flex flex-col gap-2">
+					{#each dayTasks as task (task.id)}
+						{@const gated = !canMarkDone(task)}
+						<li
+							class="flex flex-wrap items-center gap-2 border-2 border-f p-2 {dragging === task.id
+								? 'opacity-50'
+								: ''}"
+							data-testid="day-task"
+							draggable={!task.done}
+							ondragstart={(e) => {
+								dragging = task.id;
+								e.dataTransfer?.setData('text/plain', task.id);
+							}}
+							ondragend={() => (dragging = over = null)}
+						>
+							<button
+								type="button"
+								role="checkbox"
+								aria-checked={task.done}
+								aria-label={task.done
+									? `Reopen "${task.title}" from the calendar`
+									: `Finish "${task.title}" from the calendar`}
+								title={gated ? 'Completes automatically when every item is done' : undefined}
+								class="chk inline-flex h-10 shrink-0 items-center gap-2 border-2 border-f px-2 text-xs font-bold {task.done
+									? 'bg-f text-b'
+									: ''} {gated
+									? 'cursor-not-allowed opacity-50'
+									: task.done
+										? ''
+										: 'hover:bg-f hover:text-b'}"
+								disabled={gated}
+								onclick={() => toggle(task.id)}
+							>
+								<span aria-hidden="true">{task.done ? '[X]' : '[ ]'}</span>
+								<span aria-hidden="true">{gated ? 'AUTO' : task.done ? 'UNDO' : 'DO IT'}</span>
+							</button>
+							<span class="min-w-32 flex-1 break-words" class:line-through={task.done}>
+								{task.title}
+							</span>
+							<span class="tag">{task.complexity.toUpperCase()}</span>
+							<span class="tag" data-testid="day-task-place">{taskStore.originOf(task)}</span>
+							{#if !task.done}
+								<label class="flex items-center gap-1 text-xs">
+									MOVE_
+									<input
+										class="inp sm w-40"
+										type="date"
+										value={task.dueDate}
+										aria-label={`Move "${task.title}" to another day`}
+										onchange={(e) => changeDay(e, task.id, task.dueDate)}
+									/>
+								</label>
+							{/if}
+						</li>
+					{/each}
+				</ul>
+				<p class="text-xs">&gt; Drag an open task onto another day, or pick a date, to move it.</p>
+			{/if}
+		{:else}
+			<p class="text-sm">&gt; Pick a day to see its tasks.</p>
+		{/if}
+	</div>
+</section>

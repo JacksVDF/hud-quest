@@ -32,6 +32,13 @@
 	let workspaceId = $state('');
 	let dueDate = $state('');
 	let repeat = $state<Repeat | ''>('');
+	let titleEl = $state<HTMLInputElement>();
+
+	/** Fills in the due day (used by the calendar's + ADD) and puts the cursor in the title. */
+	export function prefill(day: string) {
+		dueDate = day;
+		titleEl?.focus();
+	}
 
 	function submit(e: SubmitEvent) {
 		e.preventDefault();
@@ -54,6 +61,7 @@
 			<input
 				class="inp mt-1"
 				bind:value={title}
+				bind:this={titleEl}
 				placeholder="write here"
 				maxlength="120"
 				required

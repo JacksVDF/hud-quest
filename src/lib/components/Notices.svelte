@@ -9,7 +9,11 @@
 
 <!-- Fixed height (two lines on mobile), so a message never pushes the page down or up.
      Old and new banners share one grid cell so a replaced message cross-fades in place. -->
-<div aria-live="polite" class="grid h-[4.5rem] grid-rows-[minmax(0,1fr)] sm:h-16">
+<div
+	aria-live="polite"
+	data-testid="notices"
+	class="grid h-[4.5rem] grid-rows-[minmax(0,1fr)] sm:h-16"
+>
 	{#key notice.key}
 		{#if notice.message}
 			<Banner message={notice.message} onclose={() => notice.clear()} />

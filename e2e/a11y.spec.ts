@@ -42,6 +42,28 @@ const seed = () => ({
 			notes: 'x',
 			workspaceId: 'w1'
 		},
+		// Due today (one open, one done) so the calendar has marked days and a list for today.
+		{
+			id: 'e',
+			title: 'Due today',
+			complexity: 'easy',
+			done: false,
+			tags: [],
+			items: [],
+			notes: '',
+			dueDate: today()
+		},
+		{
+			id: 'f',
+			title: 'Done today',
+			complexity: 'easy',
+			done: true,
+			tags: [],
+			items: [],
+			notes: '',
+			dueDate: today(),
+			workspaceId: 'w1'
+		},
 		{
 			id: 'd',
 			title: 'Binned',

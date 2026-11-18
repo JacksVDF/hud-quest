@@ -2,6 +2,7 @@
 	import { onMount } from 'svelte';
 	import AccountMenu from '#lib/components/AccountMenu.svelte';
 	import AppHeader from '#lib/components/AppHeader.svelte';
+	import Calendar from '#lib/components/Calendar.svelte';
 	import LevelCard from '#lib/components/LevelCard.svelte';
 	import Notices from '#lib/components/Notices.svelte';
 	import TaskForm from '#lib/components/TaskForm.svelte';
@@ -27,6 +28,7 @@
 
 	const inbox = $derived(tasksIn(taskStore.tasks, undefined));
 	let list = $state<ReturnType<typeof TaskList>>();
+	let form = $state<ReturnType<typeof TaskForm>>();
 
 	function addTask(
 		title: string,
@@ -83,9 +85,16 @@
 			streak={taskStore.loaded ? currentStreak(taskStore.activity, clock.today) : undefined}
 		/>
 
-		<TaskForm disabled={!taskStore.loaded} workspaces={taskStore.workspaces} onadd={addTask} />
+		<Calendar onadd={(day) => form?.prefill(day)} />
 
 		<Notices />
+
+		<TaskForm
+			bind:this={form}
+			disabled={!taskStore.loaded}
+			workspaces={taskStore.workspaces}
+			onadd={addTask}
+		/>
 
 		<section aria-labelledby="workspaces-title" class="flex flex-col gap-4">
 			<h2 id="workspaces-title" class="h text-2xl">

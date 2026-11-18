@@ -22,8 +22,11 @@ async function addTask(page: Page, title: string, due?: string, repeat?: string)
 	await expect(page.getByLabel('NEW_TASK_')).toHaveValue('');
 }
 
+/** The task list, not the calendar's list of the day, which shows the same tasks. */
+const list = (page: Page) => page.locator('section[aria-labelledby="list-title"]');
+
 const row = (page: Page, title: string) =>
-	page.getByRole('listitem').filter({ hasText: title }).first();
+	list(page).getByRole('listitem').filter({ hasText: title }).first();
 
 test('the repeat is disabled until there is a date, and clears with it', async ({ page }) => {
 	const repeat = page.getByTestId('repeat').first();
@@ -66,19 +69,22 @@ test('the due filter keeps only open tasks due today or overdue', async ({ page 
 	await addTask(page, 'today one', await day(page, 0));
 	await addTask(page, 'later one', await day(page, 4));
 	await page.getByTestId('filter-due').click();
-	await expect(page.getByText('late one')).toBeVisible();
-	await expect(page.getByText('today one')).toBeVisible();
-	await expect(page.getByText('later one')).toHaveCount(0);
-	await expect(page.getByText('no date')).toHaveCount(0);
+	await expect(list(page).getByText('late one')).toBeVisible();
+	await expect(list(page).getByText('today one')).toBeVisible();
+	await expect(list(page).getByText('later one')).toHaveCount(0);
+	await expect(list(page).getByText('no date')).toHaveCount(0);
 	await page.getByTestId('filter-due').click();
-	await expect(page.getByText('later one')).toBeVisible();
+	await expect(list(page).getByText('later one')).toBeVisible();
 });
 
 test('edits and clears a deadline', async ({ page }) => {
 	await addTask(page, 'move me');
 	// The editor opens inside the task's own row, which has its own date and repeat fields.
 	// While editing, the title is an input value rather than text, so find the row by that input.
-	const editor = () => page.getByRole('listitem').filter({ has: page.getByLabel('Task title') });
+	const editor = () =>
+		list(page)
+			.getByRole('listitem')
+			.filter({ has: page.getByLabel('Task title') });
 	await page.getByRole('button', { name: 'Edit "move me"' }).click();
 	await editor()
 		.getByTestId('due-date')
@@ -100,20 +106,20 @@ test('completing a recurring task creates the next one, and the deadline survive
 }) => {
 	await addTask(page, 'water plants', await day(page, 0), 'weekly');
 	await page.getByRole('checkbox', { name: 'Mark "water plants" as done' }).click();
-	await expect(page.getByText('water plants')).toHaveCount(2);
+	await expect(list(page).getByText('water plants')).toHaveCount(2);
 
 	await page.reload();
 	await expect(page.getByText('loading…')).toHaveCount(0);
-	await expect(page.getByText('water plants')).toHaveCount(2);
+	await expect(list(page).getByText('water plants')).toHaveCount(2);
 	const open = page.getByRole('checkbox', { name: 'Mark "water plants" as done' });
 	await expect(open).toHaveCount(1);
-	await expect(page.getByRole('listitem').filter({ hasText: 'WEEKLY' })).toHaveCount(2);
+	await expect(list(page).getByRole('listitem').filter({ hasText: 'WEEKLY' })).toHaveCount(2);
 });
 
 test('undoing a recurring task removes the copy it created', async ({ page }) => {
 	await addTask(page, 'stretch', await day(page, 0), 'daily');
 	await page.getByRole('checkbox', { name: 'Mark "stretch" as done' }).click();
-	await expect(page.getByText('stretch')).toHaveCount(2);
+	await expect(list(page).getByText('stretch')).toHaveCount(2);
 	await page.getByRole('checkbox', { name: 'Mark "stretch" as not done' }).click();
-	await expect(page.getByText('stretch')).toHaveCount(1);
+	await expect(list(page).getByText('stretch')).toHaveCount(1);
 });

@@ -42,6 +42,11 @@ export function addMonths(day: string, n: number): string {
 	return format(target);
 }
 
+/** 0 for Monday up to 6 for Sunday, the order the calendar shows the week in. */
+export function weekdayOf(day: string): number {
+	return (parse(day).getDay() + 6) % 7;
+}
+
 export const REPEATS = ['daily', 'weekly', 'monthly'] as const;
 export type Repeat = (typeof REPEATS)[number];
 
