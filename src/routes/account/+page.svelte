@@ -4,14 +4,34 @@
 	import { resolve } from '$app/paths';
 	import AppHeader from '#lib/components/AppHeader.svelte';
 	import { authClient } from '#lib/auth-client.ts';
+	import { buildExport, download } from '#lib/export.ts';
 	import { session } from '#lib/session.svelte.ts';
+	import { parseData } from '#lib/workspaces.ts';
 
 	let password = $state('');
 	let error = $state('');
 	let busy = $state(false);
 	let confirming = $state(false);
+	let exporting = $state(false);
+	let exportError = $state('');
 
 	onMount(() => void session.refresh());
+
+	/** Downloads what is saved on the server, read fresh so it matches what the account really holds. */
+	async function exportData() {
+		if (exporting) return;
+		exportError = '';
+		exporting = true;
+		try {
+			const res = await fetch('/api/tasks');
+			if (!res.ok) throw new Error(String(res.status));
+			download(buildExport(parseData(await res.text()), Date.now()));
+		} catch {
+			exportError = 'Could not download your data. Try again.';
+		} finally {
+			exporting = false;
+		}
+	}
 
 	async function deleteAccount(e: SubmitEvent) {
 		e.preventDefault();
@@ -54,6 +74,27 @@
 			<a class="btn o sm self-start" href={resolve('/login')}>LOGIN</a>
 		{:else}
 			<p class="text-sm" data-testid="account-page-email">&gt; Signed in as {session.email}</p>
+
+			<section class="flex max-w-md flex-col gap-4 border-2 border-f p-4">
+				<h2 class="h text-2xl">_EXPORT;</h2>
+				<p class="text-sm">
+					Download your workspaces, tasks (trash included) and daily history as one JSON file.
+				</p>
+				<div aria-live="polite">
+					{#if exportError}
+						<p class="border-2 border-f p-3 text-sm" role="alert">[!] {exportError}</p>
+					{/if}
+				</div>
+				<button
+					type="button"
+					class="btn o self-start"
+					disabled={exporting}
+					data-testid="export"
+					onclick={exportData}
+				>
+					{exporting ? 'WAIT…' : 'DOWNLOAD MY DATA'}
+				</button>
+			</section>
 
 			<section class="flex max-w-md flex-col gap-4 border-2 border-f p-4">
 				<h2 class="h text-2xl">_DELETE;</h2>

@@ -5,6 +5,7 @@
 	import LevelCard from '#lib/components/LevelCard.svelte';
 	import Notices from '#lib/components/Notices.svelte';
 	import TaskForm from '#lib/components/TaskForm.svelte';
+	import Welcome from '#lib/components/Welcome.svelte';
 	import TaskList from '#lib/components/TaskList.svelte';
 	import Trash from '#lib/components/Trash.svelte';
 	import WorkspaceCard from '#lib/components/WorkspaceCard.svelte';
@@ -67,6 +68,14 @@
 
 	<main class="mt-8 flex flex-col gap-8">
 		<h1 class="h text-4xl sm:text-5xl">_TASKS;</h1>
+
+		<Welcome
+			fresh={taskStore.loaded &&
+				taskStore.tasks.length === 0 &&
+				taskStore.trash.length === 0 &&
+				taskStore.workspaces.length === 0 &&
+				Object.keys(taskStore.activity).length === 0}
+		/>
 
 		<LevelCard
 			info={taskStore.levelInfo}

@@ -298,3 +298,40 @@ test('trash is kept in the account and restores in another session', async ({ pa
 	await page.getByRole('button', { name: 'Restore "Remote bin"' }).click();
 	await expect(page.getByRole('checkbox', { name: 'Mark "Remote bin" as done' })).toBeVisible();
 });
+
+test('downloads the account data as a JSON file without the email in it', async ({ page }) => {
+	const email = uniqueEmail();
+	await signUp(page, email);
+	await page.getByLabel('NEW_TASK_').fill('Export me');
+	await page.getByRole('button', { name: /^ADD >/ }).click();
+	await page.getByRole('checkbox', { name: 'Mark "Export me" as done' }).click();
+	await expect(page.getByText('Task completed: +10 XP.')).toBeVisible();
+
+	await page.getByTestId('account-email').click();
+	await expect(page).toHaveURL(/\/account$/);
+	// Saving is asynchronous: wait until the server really holds the task before exporting it.
+	await expect
+		.poll(async () => JSON.stringify(await (await page.request.get('/api/tasks')).json()))
+		.toContain('Export me');
+
+	const [download] = await Promise.all([
+		page.waitForEvent('download'),
+		page.getByTestId('export').click()
+	]);
+	expect(download.suggestedFilename()).toMatch(/^hud-quest-\d{4}-\d{2}-\d{2}\.json$/);
+
+	const path = await download.path();
+	const { readFileSync } = await import('node:fs');
+	const text = readFileSync(path, 'utf8');
+	const file = JSON.parse(text);
+	expect(file.app).toBe('HUD//QUEST');
+	expect(file.tasks).toMatchObject([{ title: 'Export me', done: true }]);
+	expect(Object.values(file.activity)).toEqual([{ easy: 1, medium: 0, hard: 0, xp: 10 }]);
+	expect(text).not.toContain(email);
+});
+
+test('the export button is not offered to guests', async ({ page }) => {
+	await page.goto('/account');
+	await expect(page.getByText('You are not signed in.')).toBeVisible();
+	await expect(page.getByTestId('export')).toHaveCount(0);
+});

@@ -6,6 +6,16 @@ export default defineConfig({
 	reporter: 'list',
 	use: {
 		baseURL: 'http://127.0.0.1:4173',
+		// The welcome panel is closed by default, so it does not sit on top of every other test.
+		storageState: {
+			cookies: [],
+			origins: [
+				{
+					origin: 'http://127.0.0.1:4173',
+					localStorage: [{ name: 'hud-quest-todo:welcome', value: '1' }]
+				}
+			]
+		},
 		// Uses the Google Chrome already installed, so no browser download is needed.
 		channel: 'chrome'
 	},
