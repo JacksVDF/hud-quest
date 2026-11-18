@@ -16,6 +16,8 @@ export default defineConfig({
 				}
 			]
 		},
+		// The service worker is tested in pwa.spec.ts only; elsewhere it would cache pages between tests.
+		serviceWorkers: 'block',
 		// Uses the Google Chrome already installed, so no browser download is needed.
 		channel: 'chrome'
 	},

@@ -79,9 +79,15 @@ The e2e suite includes an accessibility scan (axe, WCAG 2.2 AA) of every page in
 - The account page (`/account`, click your email in the header) can delete the account and all its data. The password is always required.
 - The theme is always saved in the browser.
 
+**Install and offline (PWA):** the app can be installed (`static/manifest.webmanifest`, icons 192/512 plus a maskable one, made by `npm run icons`) and opens without a network. A service worker (`src/service-worker/`) keeps only the shell: scripts, styles, fonts, icons and the prerendered pages. It never touches `/api/*`, so no account data is stored on the device and one person's tasks can never show up for another on a shared computer. Pages are fetched from the network first and fall back to the stored copy; an address that was never stored (such as a workspace page) goes to the start page.
+
+- Guests work fully offline: their data already lives in the browser.
+- Signed-in users can keep reading what is on screen when the connection drops, and a notice says changes are not saved. There is no queue of pending changes: nothing is sent later. If they _open_ the app offline, their tasks cannot be shown (they are not kept on the device), so a notice says so; the guest list is not shown in their place. When the connection returns, the account loads by itself.
+- A new version never replaces the page you are using. A `NEW VERSION READY` bar appears, and the app reloads only after `RELOAD >` is pressed.
+- The Playwright tests (`e2e/pwa.spec.ts`) are the only ones that allow the service worker; the rest run with it blocked so pages are not cached between tests.
+
 ## Known limits
 
-- Not installable as an app and no offline mode yet (deferred on purpose).
 - No email verification and no password recovery yet (they need an email sender and a domain). A forgotten password means a lost account.
 - `npm audit` reports 15 low/moderate issues, all in dev tooling (eslint, minimatch) or a prototype-pollution advisory in `deepmerge`, which is used by the build tool only. The only fixes npm offers are major downgrades, so they are not applied. Re-check after dependency updates.
 
@@ -103,7 +109,9 @@ src/lib/app.svelte.ts      starts the app: session, storage choice, guest import
 src/lib/notice.svelte.ts   the message line shared by every page
 src/lib/task-store.svelte.ts   reactive store; storage is swappable
 src/lib/storage.ts         TaskStorage: localStorage (guest) and /api/tasks (account)
-src/lib/session.svelte.ts  who is signed in, as seen by the browser
+src/lib/session.svelte.ts  who is signed in, as seen by the browser (and whether the server is unreachable)
+src/service-worker/        the service worker: shell cache, offline pages, waits for the player to accept updates
+static/manifest.webmanifest  install manifest
 src/lib/server/auth.ts     Better Auth config (D1, rate limits)
 src/lib/server/db.ts       the only code that reads/writes a user's tasks
 src/routes/api/tasks/      GET/PUT the signed-in user's workspaces and tasks

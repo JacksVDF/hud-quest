@@ -28,7 +28,15 @@ class App {
 
 	async start() {
 		// Moving between pages keeps the answer; a full page load asks again.
-		if (!session.ready) await session.refresh();
+		// An unreachable server is asked again on every page, so coming back online recovers.
+		if (!session.ready || session.offline) await session.refresh();
+		// Offline with an account that was here before: its tasks are not on this device, and
+		// the guest's must not be shown in their place.
+		if (session.blocked) {
+			this.#loadedFor = undefined;
+			this.guest = null;
+			return;
+		}
 		const who = session.email;
 		if (this.#loadedFor !== who || !taskStore.loaded) {
 			if (this.#loadedFor !== who) this.#dismissed = false;
@@ -61,6 +69,11 @@ class App {
 		} catch {
 			this.importFailed = true;
 		}
+	}
+
+	/** The connection came back: find out who is signed in and load their tasks. */
+	reconnect() {
+		if (session.offline) void this.start();
 	}
 
 	async signOut() {

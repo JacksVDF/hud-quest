@@ -1,7 +1,9 @@
 <script lang="ts">
+	import { online } from 'svelte/reactivity/window';
 	import Banner from './Banner.svelte';
 	import { app, describeCounts } from '#lib/app.svelte.ts';
 	import { notice } from '#lib/notice.svelte.ts';
+	import { session } from '#lib/session.svelte.ts';
 	import { taskStore } from '#lib/task-store.svelte.ts';
 </script>
 
@@ -14,6 +16,17 @@
 		{/if}
 	{/key}
 </div>
+
+{#if session.blocked}
+	<p class="border-2 border-f p-3 text-sm" role="alert" data-testid="offline-blocked">
+		[!] You are offline. Your account tasks are not kept on this device, so they cannot be shown
+		until you reconnect.
+	</p>
+{:else if session.email && online.current === false}
+	<p class="border-2 border-f p-3 text-sm" role="alert" data-testid="offline-notice">
+		[!] You are offline. Changes are not saved until you reconnect.
+	</p>
+{/if}
 
 {#if taskStore.loaded && app.guest}
 	<div class="flex flex-col gap-3 border-2 border-f p-3 text-sm" data-testid="import-prompt">

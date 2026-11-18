@@ -6,6 +6,7 @@
 	import AppHeader from '#lib/components/AppHeader.svelte';
 	import { bestStreak, currentStreak, lastDays, totalsFor } from '#lib/activity.ts';
 	import { app } from '#lib/app.svelte.ts';
+	import { session } from '#lib/session.svelte.ts';
 	import { taskStore } from '#lib/task-store.svelte.ts';
 	import { clock } from '#lib/today.svelte.ts';
 
@@ -40,7 +41,11 @@
 		<a class="text-sm underline" href={resolve('/')}>&lt; BACK TO TASKS</a>
 		<h1 class="h text-4xl sm:text-5xl">_STATS;</h1>
 
-		{#if !taskStore.loaded}
+		{#if session.blocked}
+			<p class="text-sm" data-testid="offline-blocked">
+				&gt; Offline. Reconnect to see your stats.
+			</p>
+		{:else if !taskStore.loaded}
 			<p class="text-sm">&gt; loading…</p>
 		{:else if empty}
 			<p class="text-sm" data-testid="stats-empty">

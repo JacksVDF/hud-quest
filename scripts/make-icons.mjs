@@ -35,11 +35,19 @@ p { position: absolute; left: 66px; top: 392px; font: 400 40px/1.4 'Space Mono';
 const square = (size) =>
 	`<!doctype html><style>*{margin:0}img{display:block;width:${size}px;height:${size}px}</style><img src="${logoUri}" alt="" />`;
 
+// Maskable icons are cropped to a circle or rounded square by the system, so the logo must sit
+// inside the central 80% ("safe zone"). The black background runs to the edges.
+const maskable = (size) =>
+	`<!doctype html><style>*{margin:0}body{width:${size}px;height:${size}px;background:#000;display:grid;place-items:center}img{width:${Math.round(size * 0.6)}px;height:${Math.round(size * 0.6)}px}</style><img src="${logoUri}" alt="" />`;
+
 const browser = await chromium.launch({ channel: 'chrome' });
 try {
 	const jobs = [
 		['static/icon-32.png', square(32), 32, 32],
 		['static/apple-touch-icon.png', square(180), 180, 180],
+		['static/icon-192.png', square(192), 192, 192],
+		['static/icon-512.png', square(512), 512, 512],
+		['static/icon-maskable-512.png', maskable(512), 512, 512],
 		['static/og-image.png', social, 1200, 630]
 	];
 	for (const [file, html, width, height] of jobs) {

@@ -19,6 +19,8 @@
 			</a>
 			<button type="button" class="btn o sm" onclick={onsignout}>LOGOUT</button>
 		</div>
+	{:else if session.blocked}
+		<span class="text-xs" data-testid="offline-badge">OFFLINE</span>
 	{:else}
 		<a class="btn o sm" href={resolve('/login')}>LOGIN</a>
 	{/if}

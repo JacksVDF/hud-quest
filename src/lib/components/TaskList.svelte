@@ -7,6 +7,7 @@
 	import { MOTION, dismiss, ms } from '#lib/motion.ts';
 	import { notice } from '#lib/notice.svelte.ts';
 	import { PAGE_SIZE, clampPage, pageCount, paginate } from '#lib/pagination.ts';
+	import { session } from '#lib/session.svelte.ts';
 	import { taskStore } from '#lib/task-store.svelte.ts';
 	import { clock } from '#lib/today.svelte.ts';
 	import { allTags, filterTasks, type StatusFilter, type Task } from '#lib/tasks.ts';
@@ -82,7 +83,9 @@
 		{title} <span class="text-sm font-normal">{doneCount}/{tasks.length}</span>
 	</h2>
 
-	{#if taskStore.problem === 'load'}
+	{#if session.blocked}
+		<p class="text-sm">&gt; Offline. Reconnect to see your tasks.</p>
+	{:else if taskStore.problem === 'load'}
 		<p class="border-2 border-f p-3 text-sm" role="alert">
 			[!] Could not load your tasks. Reload the page to try again.
 		</p>
