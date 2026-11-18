@@ -70,7 +70,7 @@
 				<table class="w-full border-2 border-f text-left text-sm" data-testid="totals">
 					<thead>
 						<tr class="border-b-2 border-f">
-							<th class="p-3 font-bold" scope="col"></th>
+							<th class="p-3 font-bold" scope="col"><span class="sr-only">PERIOD</span></th>
 							<th class="p-3 font-bold" scope="col">7 DAYS</th>
 							<th class="p-3 font-bold" scope="col">30 DAYS</th>
 						</tr>
