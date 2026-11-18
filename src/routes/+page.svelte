@@ -12,6 +12,7 @@
 	import { currentStreak } from '#lib/activity.ts';
 	import { app } from '#lib/app.svelte.ts';
 	import { notice } from '#lib/notice.svelte.ts';
+	import { SITE_DESCRIPTION, SITE_URL } from '#lib/site.ts';
 	import { taskStore } from '#lib/task-store.svelte.ts';
 	import { clock } from '#lib/today.svelte.ts';
 	import { INBOX_ID, MAX_WORKSPACES, tasksIn, workspaceStats } from '#lib/workspaces.ts';
@@ -50,17 +51,11 @@
 
 <svelte:head>
 	<title>HUD//QUEST — To-Do</title>
-	<meta
-		name="description"
-		content="A gamified to-do list: complete tasks to earn XP, level up and climb the ranks."
-	/>
+	<meta name="description" content={SITE_DESCRIPTION} />
 	<meta property="og:type" content="website" />
 	<meta property="og:title" content="HUD//QUEST — To-Do" />
-	<meta
-		property="og:description"
-		content="A gamified to-do list: complete tasks to earn XP, level up and climb the ranks."
-	/>
-	<meta name="twitter:card" content="summary" />
+	<meta property="og:description" content={SITE_DESCRIPTION} />
+	<meta property="og:url" content={SITE_URL} />
 </svelte:head>
 
 <div class="mx-auto max-w-3xl px-4 pb-16 sm:px-6">

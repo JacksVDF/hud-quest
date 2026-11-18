@@ -16,6 +16,7 @@
 		"test:e2e": "playwright test",
 		"deploy": "npm run build && wrangler deploy && npm run smoke",
 		"smoke": "node scripts/smoke.mjs",
+		"icons": "node scripts/make-icons.mjs",
 		"db:migrate:local": "wrangler d1 migrations apply hud-quest-db --local",
 		"db:migrate:remote": "wrangler d1 migrations apply hud-quest-db --remote"
 	},
