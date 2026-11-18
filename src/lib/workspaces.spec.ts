@@ -171,14 +171,18 @@ describe('toData', () => {
 
 describe('parseData', () => {
 	it('returns an empty document for missing or broken JSON', () => {
-		const empty = { workspaces: [], tasks: [] };
+		const empty = { workspaces: [], tasks: [], activity: {} };
 		expect(parseData(null)).toEqual(empty);
 		expect(parseData('{not json')).toEqual(empty);
 		expect(parseData('42')).toEqual(empty);
 	});
 
 	it('round-trips a document', () => {
-		const doc = { workspaces: [ws('w1', 'Work')], tasks: [task({ workspaceId: 'w1' })] };
+		const doc = {
+			workspaces: [ws('w1', 'Work')],
+			tasks: [task({ workspaceId: 'w1' })],
+			activity: { '2026-11-03': { easy: 1, medium: 0, hard: 0, xp: 10 } }
+		};
 		expect(parseData(JSON.stringify(doc))).toEqual(doc);
 	});
 });

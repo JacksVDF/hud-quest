@@ -1,3 +1,4 @@
+import { toActivity, type Activity } from './activity';
 import { PAGE_SIZE } from './pagination';
 import { MAX_ID_LENGTH, toTasks, type Task } from './tasks';
 
@@ -7,10 +8,12 @@ export interface Workspace {
 	name: string;
 }
 
-/** Everything a user saves: their workspaces and all their tasks (active and trashed). */
+/** Everything a user saves: their workspaces, all their tasks (active and trashed) and their daily activity. */
 export interface Data {
 	workspaces: Workspace[];
 	tasks: Task[];
+	/** What was completed each day. It outlives the tasks, so deleting one never rewrites history. */
+	activity: Activity;
 }
 
 /** One global "ten": items per page and the most workspaces a user can have. */
@@ -99,10 +102,12 @@ export function toWorkspaces(data: unknown): Workspace[] {
 export function toData(value: unknown): Data | null {
 	let workspaces: Workspace[] = [];
 	let rawTasks: unknown = value;
+	let activity: Activity = {};
 	if (typeof value === 'object' && value !== null && !Array.isArray(value)) {
 		const doc = value as Record<string, unknown>;
 		workspaces = toWorkspaces(doc.workspaces);
 		rawTasks = doc.tasks;
+		activity = toActivity(doc.activity);
 	}
 	const tasks = toTasks(rawTasks);
 	if (!tasks) return null;
@@ -112,12 +117,12 @@ export function toData(value: unknown): Data | null {
 			delete t.workspaceId;
 		}
 	}
-	return { workspaces, tasks };
+	return { workspaces, tasks, activity };
 }
 
 /** Parse saved JSON; returns an empty document for anything missing or malformed. */
 export function parseData(json: string | null): Data {
-	const empty = (): Data => ({ workspaces: [], tasks: [] });
+	const empty = (): Data => ({ workspaces: [], tasks: [], activity: {} });
 	if (!json) return empty();
 	try {
 		return toData(JSON.parse(json)) ?? empty();

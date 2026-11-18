@@ -1,11 +1,16 @@
+import { mergeActivity, recordTask, recordXp, type Activity } from './activity';
+import { dayKey, nextDue, type Repeat } from './dates';
 import { ConflictError, createLocalStorage, type TaskStorage } from './storage';
 import {
 	MAX_NOTES_LENGTH,
 	addTag,
 	canMarkDone,
 	dropExpired,
+	normalizeSchedule,
 	reconcileDone,
+	taskXp,
 	totalXp,
+	type Schedule,
 	type Task
 } from './tasks';
 import { levelFromXp } from './xp';
@@ -39,6 +44,9 @@ export class TaskStore {
 	/** The user's workspaces, in creation order. Tasks without one live in the INBOX. */
 	#workspaces = $state<Workspace[]>([]);
 	workspaces = $derived(this.#workspaces);
+	/** What was completed each day. Streaks and statistics read it, not the task list. */
+	#activity = $state<Activity>({});
+	activity = $derived(this.#activity);
 	/** Everything that is saved: active tasks and trashed ones. */
 	#all = $state<Task[]>([]);
 	/** Active tasks. Trashed ones do not count for XP, filters or the list. */
@@ -73,6 +81,7 @@ export class TaskStore {
 		const apply = (data: Data) => {
 			if (generation !== this.#generation) return;
 			this.#workspaces = data.workspaces;
+			this.#activity = data.activity;
 			this.#all = dropExpired(data.tasks, Date.now());
 			this.loaded = true;
 		};
@@ -87,6 +96,7 @@ export class TaskStore {
 	useStorage(storage: TaskStorage) {
 		this.#storage = storage;
 		this.#workspaces = [];
+		this.#activity = {};
 		this.#all = [];
 		return this.load();
 	}
@@ -108,7 +118,7 @@ export class TaskStore {
 	}
 
 	#data(): Data {
-		return { workspaces: this.#workspaces, tasks: this.#all };
+		return { workspaces: this.#workspaces, tasks: this.#all, activity: this.#activity };
 	}
 
 	/**
@@ -155,14 +165,16 @@ export class TaskStore {
 			});
 		if (fresh.length === 0 && addedWorkspaces === 0) return none;
 
-		const before = { workspaces: this.#workspaces, all: this.#all };
+		const before = { workspaces: this.#workspaces, all: this.#all, activity: this.#activity };
 		this.#workspaces = workspaces;
 		this.#all = [...before.all, ...fresh];
+		this.#activity = mergeActivity(before.activity, incoming.activity);
 		try {
 			await this.#storage.save(this.#data());
 		} catch (e) {
 			this.#workspaces = before.workspaces;
 			this.#all = before.all;
+			this.#activity = before.activity;
 			throw e;
 		}
 		return { tasks: fresh.length, workspaces: addedWorkspaces };
@@ -175,6 +187,73 @@ export class TaskStore {
 		mutate();
 		this.#save();
 		return { delta: this.xp - xpBefore, levelBefore, levelAfter: this.levelInfo.level };
+	}
+
+	/**
+	 * Runs a change to one task and keeps the daily record in step with it. Completing a task
+	 * counts it (and its XP) on today, and a recurring one creates its next occurrence. Undoing
+	 * it takes both back from the day it was counted on. Deleting a task changes nothing here:
+	 * what was achieved stays achieved.
+	 */
+	#settle(task: Task, mutate: () => void) {
+		const wasDone = task.done;
+		const xpBefore = taskXp(task);
+		mutate();
+		const now = Date.now();
+		const delta = taskXp(task) - xpBefore;
+
+		if (!wasDone && task.done) {
+			const today = dayKey(now);
+			task.completedAt = now;
+			this.#activity = recordXp(
+				recordTask(this.#activity, today, task.complexity, 1),
+				today,
+				delta
+			);
+			this.#spawnNext(task, today);
+		} else if (wasDone && !task.done) {
+			const day = dayKey(task.completedAt ?? now);
+			delete task.completedAt;
+			this.#activity = recordXp(recordTask(this.#activity, day, task.complexity, -1), day, delta);
+			this.#withdrawNext(task);
+		} else {
+			// A hard task's milestones release XP one by one, before the task itself is done.
+			this.#activity = recordXp(this.#activity, dayKey(now), delta);
+		}
+	}
+
+	/** The next occurrence of a recurring task, once per task. */
+	#spawnNext(task: Task, today: string) {
+		if (!task.repeat || !task.dueDate || task.spawnedId) return;
+		const id = crypto.randomUUID();
+		const next: Task = {
+			id,
+			title: task.title,
+			complexity: task.complexity,
+			done: false,
+			tags: [...task.tags],
+			items: task.items.map((i) => ({ id: crypto.randomUUID(), title: i.title, done: false })),
+			notes: task.notes,
+			dueDate: nextDue(task.dueDate, task.repeat, today),
+			repeat: task.repeat
+		};
+		if (task.workspaceId !== undefined) next.workspaceId = task.workspaceId;
+		task.spawnedId = id;
+		this.#all.push(next);
+	}
+
+	/**
+	 * Un-completing a recurring task removes the occurrence it created, but only while that one
+	 * is still untouched. Otherwise it stays, and the link is kept so completing the task again
+	 * does not create a second copy.
+	 */
+	#withdrawNext(task: Task) {
+		if (!task.spawnedId) return;
+		const next = this.#all.find((t) => t.id === task.spawnedId && t.deletedAt === undefined);
+		if (next && !next.done && next.items.every((i) => !i.done)) {
+			this.#all = this.#all.filter((t) => t !== next);
+			delete task.spawnedId;
+		}
 	}
 
 	/** An active task; trashed tasks cannot be edited or toggled. */
@@ -199,7 +278,8 @@ export class TaskStore {
 		title: string,
 		complexity: Complexity,
 		tags: string[] = [],
-		workspaceId?: string
+		workspaceId?: string,
+		schedule: Schedule = {}
 	): string | undefined {
 		const clean = title.trim();
 		if (!clean || !this.loaded) return;
@@ -215,6 +295,7 @@ export class TaskStore {
 		};
 		const workspace = this.#validWorkspace(workspaceId);
 		if (workspace !== undefined) task.workspaceId = workspace;
+		Object.assign(task, normalizeSchedule(schedule.dueDate, schedule.repeat));
 		this.#all.push(task);
 		this.#save();
 		return id;
@@ -291,9 +372,28 @@ export class TaskStore {
 	}
 
 	/** Complexity is intentionally not editable for now. */
-	update(id: string, patch: { title?: string; tags?: string[]; notes?: string }) {
+	update(
+		id: string,
+		patch: {
+			title?: string;
+			tags?: string[];
+			notes?: string;
+			/** `null` (or an invalid day) clears the deadline, and with it the repeat. */
+			dueDate?: string | null;
+			repeat?: Repeat | null;
+		}
+	) {
 		const task = this.#find(id);
 		if (!task) return;
+		if ('dueDate' in patch || 'repeat' in patch) {
+			const schedule = normalizeSchedule(
+				'dueDate' in patch ? patch.dueDate : task.dueDate,
+				'repeat' in patch ? patch.repeat : task.repeat
+			);
+			delete task.dueDate;
+			delete task.repeat;
+			Object.assign(task, schedule);
+		}
 		const title = patch.title?.trim();
 		if (title) task.title = title;
 		if (patch.tags) task.tags = patch.tags.reduce<string[]>(addTag, []);
@@ -307,7 +407,7 @@ export class TaskStore {
 	toggle(id: string): (Change & { done: boolean }) | null {
 		const task = this.#find(id);
 		if (!task || !canMarkDone(task)) return null;
-		const change = this.#change(() => (task.done = !task.done));
+		const change = this.#change(() => this.#settle(task, () => (task.done = !task.done)));
 		return { ...change, done: task.done };
 	}
 
@@ -315,29 +415,35 @@ export class TaskStore {
 		const task = this.#find(taskId);
 		const clean = title.trim();
 		if (!task || task.complexity === 'easy' || !clean) return null;
-		return this.#change(() => {
-			task.items.push({ id: crypto.randomUUID(), title: clean, done: false });
-			task.done = reconcileDone(task);
-		});
+		return this.#change(() =>
+			this.#settle(task, () => {
+				task.items.push({ id: crypto.randomUUID(), title: clean, done: false });
+				task.done = reconcileDone(task);
+			})
+		);
 	}
 
 	toggleItem(taskId: string, itemId: string): Change | null {
 		const task = this.#find(taskId);
 		const item = task?.items.find((i) => i.id === itemId);
 		if (!task || !item) return null;
-		return this.#change(() => {
-			item.done = !item.done;
-			task.done = reconcileDone(task);
-		});
+		return this.#change(() =>
+			this.#settle(task, () => {
+				item.done = !item.done;
+				task.done = reconcileDone(task);
+			})
+		);
 	}
 
 	removeItem(taskId: string, itemId: string): Change | null {
 		const task = this.#find(taskId);
 		if (!task) return null;
-		return this.#change(() => {
-			task.items = task.items.filter((i) => i.id !== itemId);
-			task.done = reconcileDone(task);
-		});
+		return this.#change(() =>
+			this.#settle(task, () => {
+				task.items = task.items.filter((i) => i.id !== itemId);
+				task.done = reconcileDone(task);
+			})
+		);
 	}
 
 	/** Moves a task to the trash. Its XP is removed until it is restored. */

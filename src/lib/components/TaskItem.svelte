@@ -1,10 +1,13 @@
 <script lang="ts">
 	import { slide } from 'svelte/transition';
 	import Checklist from './Checklist.svelte';
+	import DueFields from './DueFields.svelte';
 	import ProgressBar from './ProgressBar.svelte';
 	import TagInput from './TagInput.svelte';
+	import { formatDay, type Repeat } from '#lib/dates.ts';
 	import { MOTION, ms } from '#lib/motion.ts';
-	import { MAX_NOTES_LENGTH, canMarkDone, taskXp, type Task } from '#lib/tasks.ts';
+	import { clock } from '#lib/today.svelte.ts';
+	import { MAX_NOTES_LENGTH, canMarkDone, taskDueState, taskXp, type Task } from '#lib/tasks.ts';
 	import { XP_BY_COMPLEXITY } from '#lib/xp.ts';
 	import type { Workspace } from '#lib/workspaces.ts';
 
@@ -23,7 +26,16 @@
 		/** Where the task can be moved to (the INBOX is always an option). */
 		workspaces?: Workspace[];
 		ontoggle: (id: string) => void;
-		onsave: (id: string, patch: { title?: string; tags?: string[]; notes?: string }) => void;
+		onsave: (
+			id: string,
+			patch: {
+				title?: string;
+				tags?: string[];
+				notes?: string;
+				dueDate?: string | null;
+				repeat?: Repeat | null;
+			}
+		) => void;
 		onmove?: (id: string, workspaceId: string | undefined) => void;
 		onremove: (id: string) => void;
 		onadditem: (taskId: string, title: string) => void;
@@ -38,6 +50,8 @@
 	let draftNotes = $state('');
 	/** '' is the INBOX. */
 	let draftWorkspace = $state('');
+	let draftDue = $state('');
+	let draftRepeat = $state<Repeat | ''>('');
 
 	const isProject = $derived(task.complexity === 'hard');
 	const hasPanel = $derived(task.complexity !== 'easy');
@@ -47,18 +61,27 @@
 	const earned = $derived(taskXp(task));
 	const noun = $derived(isProject ? 'milestone' : 'subtask');
 	const panelId = $derived(`panel-${task.id}`);
+	const due = $derived(taskDueState(task, clock.today));
+	const REPEAT_WORD = { daily: 'DAILY', weekly: 'WEEKLY', monthly: 'MONTHLY' } as const;
 
 	function startEdit() {
 		draftTitle = task.title;
 		draftTags = [...task.tags];
 		draftWorkspace = task.workspaceId ?? '';
+		draftDue = task.dueDate ?? '';
+		draftRepeat = task.repeat ?? '';
 		editing = true;
 	}
 
 	function save(e: SubmitEvent) {
 		e.preventDefault();
 		if (!draftTitle.trim()) return;
-		onsave(task.id, { title: draftTitle, tags: draftTags });
+		onsave(task.id, {
+			title: draftTitle,
+			tags: draftTags,
+			dueDate: draftDue || null,
+			repeat: draftRepeat || null
+		});
 		editing = false;
 		if (draftWorkspace !== (task.workspaceId ?? '')) onmove?.(task.id, draftWorkspace || undefined);
 	}
@@ -78,6 +101,7 @@
 		<form class="flex flex-col gap-3" onsubmit={save}>
 			<input class="inp" bind:value={draftTitle} maxlength="120" required aria-label="Task title" />
 			<TagInput bind:tags={draftTags} />
+			<DueFields bind:dueDate={draftDue} bind:repeat={draftRepeat} />
 			{#if onmove && workspaces.length > 0}
 				<label class="text-xs sm:max-w-sm">
 					WORKSPACE_
@@ -131,6 +155,19 @@
 				{isProject && task.items.length > 0 ? `+${earned}/${maxXp}` : `+${maxXp}`} XP
 			</span>
 			<span class="tag">{task.complexity.toUpperCase()}</span>
+			{#if task.dueDate}
+				<span
+					class="tag due"
+					class:s={due === 'overdue' || due === 'today'}
+					data-due={due ?? 'none'}
+				>
+					{#if due === 'overdue'}OVERDUE ·{:else if due === 'today'}TODAY ·{:else}DUE{/if}
+					{formatDay(task.dueDate, clock.today)}
+				</span>
+			{/if}
+			{#if task.repeat}
+				<span class="tag" title="Comes back when completed">↻ {REPEAT_WORD[task.repeat]}</span>
+			{/if}
 			<div class="flex flex-wrap gap-2">
 				{#if onmove && workspaces.length > 0}
 					<!-- Shows where the task is; choosing another place moves it without opening the editor. -->

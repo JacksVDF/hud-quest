@@ -8,6 +8,7 @@
 	import { notice } from '#lib/notice.svelte.ts';
 	import { PAGE_SIZE, clampPage, pageCount, paginate } from '#lib/pagination.ts';
 	import { taskStore } from '#lib/task-store.svelte.ts';
+	import { clock } from '#lib/today.svelte.ts';
 	import { allTags, filterTasks, type StatusFilter, type Task } from '#lib/tasks.ts';
 
 	/**
@@ -23,13 +24,14 @@
 
 	let selectedTags = $state<string[]>([]);
 	let status = $state<StatusFilter>('all');
+	let due = $state(false);
 	let requestedPage = $state(1);
 
 	const doneCount = $derived(tasks.filter((t) => t.done).length);
 	const tagOptions = $derived(allTags(tasks));
 	// Ignore selected tags that no task has anymore (e.g. after editing or deleting).
 	const activeTags = $derived(selectedTags.filter((t) => tagOptions.includes(t)));
-	const visible = $derived(filterTasks(tasks, { tags: activeTags, status }));
+	const visible = $derived(filterTasks(tasks, { tags: activeTags, status, due }, clock.today));
 	// Clamped, so deleting the last task of the last page falls back to the previous page.
 	const page = $derived(clampPage(requestedPage, visible.length));
 	const pageTasks = $derived(paginate(visible, page));
@@ -51,7 +53,7 @@
 
 	// A new filter always starts on page 1.
 	$effect(() => {
-		void [activeTags.join(), status];
+		void [activeTags.join(), status, due];
 		requestedPage = 1;
 	});
 
@@ -89,7 +91,7 @@
 	{:else if tasks.length === 0}
 		<p class="text-sm">&gt; {emptyText}</p>
 	{:else}
-		<FilterBar tags={tagOptions} bind:selected={selectedTags} bind:status />
+		<FilterBar tags={tagOptions} bind:selected={selectedTags} bind:status bind:due />
 
 		{#if visible.length === 0}
 			<p class="text-sm">&gt; No tasks match the current filters.</p>

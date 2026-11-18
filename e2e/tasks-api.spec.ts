@@ -17,7 +17,11 @@ async function newUser(browser: Browser) {
 	return { api, close: () => context.close() };
 }
 
-const doc = (tasks: unknown[] = [], workspaces: unknown[] = []) => ({ workspaces, tasks });
+const doc = (tasks: unknown[] = [], workspaces: unknown[] = [], activity: object = {}) => ({
+	workspaces,
+	tasks,
+	activity
+});
 const titles = (data: { tasks: { title: string }[] }) => data.tasks.map((t) => t.title);
 
 const task = (id: string, title: string) => ({
@@ -197,5 +201,41 @@ test('an active task pointing at a missing workspace goes back to the INBOX', as
 	await put(user.api, doc([{ ...task('a', 'Orphan'), workspaceId: 'ghost' }]));
 	const saved = await (await user.api.get('/api/tasks')).json();
 	expect(saved.tasks[0].workspaceId).toBeUndefined();
+	await user.close();
+});
+
+test('keeps the schedule and the daily activity, and drops what is invalid', async ({
+	browser
+}) => {
+	const user = await newUser(browser);
+	const scheduled = { ...task('s', 'Scheduled'), dueDate: '2026-11-12', repeat: 'weekly' };
+	const orphanRepeat = { ...task('r', 'No date'), repeat: 'daily' };
+	const badDate = { ...task('b', 'Bad date'), dueDate: '2026-02-30', repeat: 'daily' };
+	const activity = {
+		'2026-11-10': { easy: 2, medium: 1, hard: 0, xp: 45 },
+		'2026-02-30': { easy: 1, medium: 0, hard: 0, xp: 10 },
+		nope: { easy: 1, medium: 0, hard: 0, xp: 10 }
+	};
+	expect((await put(user.api, doc([scheduled, orphanRepeat, badDate], [], activity))).ok()).toBe(
+		true
+	);
+
+	const saved = await (await user.api.get('/api/tasks')).json();
+	const by = (id: string) => saved.tasks.find((t: { id: string }) => t.id === id);
+	expect(by('s')).toMatchObject({ dueDate: '2026-11-12', repeat: 'weekly' });
+	expect(by('r').repeat).toBeUndefined();
+	expect(by('b').dueDate).toBeUndefined();
+	expect(by('b').repeat).toBeUndefined();
+	expect(saved.activity).toEqual({ '2026-11-10': { easy: 2, medium: 1, hard: 0, xp: 45 } });
+	await user.close();
+});
+
+test('a save without activity (an older client) leaves it empty instead of failing', async ({
+	browser
+}) => {
+	const user = await newUser(browser);
+	const res = await put(user.api, { workspaces: [], tasks: [task('a', 'Old client')] });
+	expect(res.ok()).toBe(true);
+	expect((await res.json()).activity).toEqual({});
 	await user.close();
 });

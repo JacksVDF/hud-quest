@@ -1,3 +1,4 @@
+import { REPEATS, isDayKey, type DueState, type Repeat, dueState } from './dates';
 import { COMPLEXITIES, XP_BY_COMPLEXITY, type Complexity } from './xp';
 
 /** A subtask (medium tasks) or a milestone (hard tasks / projects). */
@@ -23,6 +24,14 @@ export interface Task {
 	workspaceId?: string;
 	/** Name of that workspace when the task was trashed along with it, so the trash can still say where it came from. */
 	originName?: string;
+	/** Optional deadline: a local day (`YYYY-MM-DD`). There is no XP penalty for missing it. */
+	dueDate?: string;
+	/** Makes a new copy appear when the task is completed. Needs a `dueDate`. */
+	repeat?: Repeat;
+	/** When the task was completed (ms since epoch); absent while it is open. Streaks use its day. */
+	completedAt?: number;
+	/** The next occurrence this recurring task created, so completing it twice never makes two. */
+	spawnedId?: string;
 }
 
 export const STORAGE_KEY = 'hud-quest-todo:tasks';
@@ -112,6 +121,25 @@ export function daysLeftInTrash(task: Task, now: number): number {
 	return Math.max(1, Math.ceil(left / (24 * 60 * 60 * 1000)));
 }
 
+/* ---------- schedule ---------- */
+
+export interface Schedule {
+	dueDate?: string;
+	repeat?: Repeat;
+}
+
+/** A valid deadline, and a repeat only when there is a deadline to repeat from. */
+export function normalizeSchedule(dueDate: unknown, repeat: unknown): Schedule {
+	if (!isDayKey(dueDate)) return {};
+	const valid = REPEATS.find((r) => r === repeat);
+	return valid ? { dueDate, repeat: valid } : { dueDate };
+}
+
+/** Where the task stands against its deadline (null when it has none or is done). */
+export function taskDueState(task: Task, today: string): DueState | null {
+	return dueState(task.dueDate, task.done, today);
+}
+
 /* ---------- filtering ---------- */
 
 export type StatusFilter = 'all' | 'open' | 'done';
@@ -119,13 +147,19 @@ export type StatusFilter = 'all' | 'open' | 'done';
 export interface TaskFilter {
 	tags: string[];
 	status: StatusFilter;
+	/** Only open tasks that are due today or overdue. */
+	due?: boolean;
 }
 
-/** Keeps tasks matching the status and having ALL of the selected tags. */
-export function filterTasks(tasks: Task[], filter: TaskFilter): Task[] {
+/** Keeps tasks matching the status and having ALL of the selected tags. `today` is needed for `due`. */
+export function filterTasks(tasks: Task[], filter: TaskFilter, today = ''): Task[] {
 	return tasks.filter((t) => {
 		if (filter.status === 'open' && t.done) return false;
 		if (filter.status === 'done' && !t.done) return false;
+		if (filter.due) {
+			const state = taskDueState(t, today);
+			if (state !== 'overdue' && state !== 'today') return false;
+		}
 		return filter.tags.every((tag) => t.tags.includes(tag));
 	});
 }
@@ -174,7 +208,14 @@ function toTask(value: unknown): Task | null {
 	if (typeof t.originName === 'string' && t.originName.trim()) {
 		task.originName = t.originName.trim().slice(0, MAX_ORIGIN_NAME);
 	}
+	Object.assign(task, normalizeSchedule(t.dueDate, t.repeat));
 	task.done = reconcileDone(task);
+	if (task.done && typeof t.completedAt === 'number' && Number.isFinite(t.completedAt)) {
+		task.completedAt = t.completedAt;
+	}
+	if (typeof t.spawnedId === 'string' && t.spawnedId && t.spawnedId.length <= MAX_ID_LENGTH) {
+		task.spawnedId = t.spawnedId;
+	}
 	return task;
 }
 

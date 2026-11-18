@@ -4,8 +4,9 @@
 	let {
 		tags,
 		selected = $bindable(),
-		status = $bindable()
-	}: { tags: string[]; selected: string[]; status: StatusFilter } = $props();
+		status = $bindable(),
+		due = $bindable(false)
+	}: { tags: string[]; selected: string[]; status: StatusFilter; due?: boolean } = $props();
 
 	const STATUSES: StatusFilter[] = ['all', 'open', 'done'];
 	const name = $props.id();
@@ -31,6 +32,20 @@
 			{/each}
 		</div>
 	</fieldset>
+
+	<div>
+		<div class="mb-1 text-xs">DEADLINE_</div>
+		<button
+			type="button"
+			class="tag inline-flex min-h-10 cursor-pointer items-center"
+			class:s={due}
+			aria-pressed={due}
+			data-testid="filter-due"
+			onclick={() => (due = !due)}
+		>
+			DUE TODAY OR OVERDUE
+		</button>
+	</div>
 
 	{#if tags.length > 0}
 		<div>

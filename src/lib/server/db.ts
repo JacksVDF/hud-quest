@@ -25,7 +25,7 @@ export async function getData(db: D1Database, userId: string): Promise<StoredDat
 		.first<{ data: string; version: number }>();
 	return row
 		? { data: parseData(row.data), version: row.version }
-		: { data: { workspaces: [], tasks: [] }, version: NO_VERSION };
+		: { data: { workspaces: [], tasks: [], activity: {} }, version: NO_VERSION };
 }
 
 /**

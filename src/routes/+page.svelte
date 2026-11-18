@@ -12,16 +12,27 @@
 	import { app } from '#lib/app.svelte.ts';
 	import { notice } from '#lib/notice.svelte.ts';
 	import { taskStore } from '#lib/task-store.svelte.ts';
+	import { clock } from '#lib/today.svelte.ts';
 	import { INBOX_ID, MAX_WORKSPACES, tasksIn, workspaceStats } from '#lib/workspaces.ts';
+	import type { Schedule } from '#lib/tasks.ts';
 	import type { Complexity } from '#lib/xp.ts';
 
-	onMount(() => void app.start());
+	onMount(() => {
+		clock.start();
+		void app.start();
+	});
 
 	const inbox = $derived(tasksIn(taskStore.tasks, undefined));
 	let list = $state<ReturnType<typeof TaskList>>();
 
-	function addTask(title: string, complexity: Complexity, tags: string[], workspaceId?: string) {
-		const id = taskStore.add(title, complexity, tags, workspaceId);
+	function addTask(
+		title: string,
+		complexity: Complexity,
+		tags: string[],
+		workspaceId?: string,
+		schedule?: Schedule
+	) {
+		const id = taskStore.add(title, complexity, tags, workspaceId, schedule);
 		if (workspaceId === undefined) {
 			// Wait for the list to include the new task before looking for its page.
 			queueMicrotask(() => list?.reveal(id));

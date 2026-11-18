@@ -15,7 +15,8 @@ function stubStorage(initial: Record<string, string> = {}) {
 
 const doc = (tasks: Task[] = [], workspaces: Data['workspaces'] = []): Data => ({
 	workspaces,
-	tasks
+	tasks,
+	activity: {}
 });
 /** What the store saved last, read back from the fake localStorage. */
 const savedTasks = (data: Map<string, string>): Task[] =>
@@ -770,5 +771,169 @@ describe('TaskStore workspaces', () => {
 		other.load();
 		expect(other.workspaces.map((w) => w.name)).toEqual(['Work']);
 		expect(data.size).toBe(1);
+	});
+});
+
+describe('TaskStore activity and schedule', () => {
+	const at = (y: number, m: number, d: number, h = 12) =>
+		vi.setSystemTime(new Date(y, m - 1, d, h).getTime());
+
+	beforeEach(() => {
+		vi.useFakeTimers();
+		at(2026, 11, 10);
+		return () => vi.useRealTimers();
+	});
+
+	it('counts a completed task and its xp on today', () => {
+		const { store } = fresh();
+		const id = store.add('a', 'medium')!;
+		store.toggle(id);
+		expect(store.activity).toEqual({
+			'2026-11-10': { easy: 0, medium: 1, hard: 0, xp: 25 }
+		});
+		expect(store.tasks[0].completedAt).toBe(Date.now());
+	});
+
+	it('takes it back from the day it was completed on, not from today', () => {
+		const { store } = fresh();
+		const id = store.add('a', 'easy')!;
+		store.toggle(id);
+		at(2026, 11, 12);
+		store.toggle(id);
+		expect(store.activity).toEqual({});
+		expect(store.tasks[0].completedAt).toBeUndefined();
+	});
+
+	it('keeps the record when the task is deleted or the trash is emptied', () => {
+		const { store } = fresh();
+		const id = store.add('a', 'easy')!;
+		store.toggle(id);
+		store.remove(id);
+		store.emptyTrash();
+		expect(store.activity['2026-11-10']).toMatchObject({ easy: 1, xp: 10 });
+		expect(store.xp).toBe(0);
+	});
+
+	it('records milestone xp for a hard task as it is released', () => {
+		const { store } = fresh();
+		const id = store.add('project', 'hard')!;
+		store.addItem(id, 'one');
+		store.addItem(id, 'two');
+		const [one, two] = store.tasks[0].items;
+		store.toggleItem(id, one.id);
+		expect(store.activity['2026-11-10']).toEqual({ easy: 0, medium: 0, hard: 0, xp: 25 });
+		store.toggleItem(id, two.id);
+		expect(store.activity['2026-11-10']).toEqual({ easy: 0, medium: 0, hard: 1, xp: 50 });
+		store.toggleItem(id, two.id);
+		expect(store.activity['2026-11-10']).toEqual({ easy: 0, medium: 0, hard: 0, xp: 25 });
+	});
+
+	it('stores a valid deadline and drops a repeat that has none', () => {
+		const { store } = fresh();
+		const a = store.add('a', 'easy', [], undefined, { dueDate: '2026-11-12', repeat: 'weekly' })!;
+		const b = store.add('b', 'easy', [], undefined, { repeat: 'daily' })!;
+		const c = store.add('c', 'easy', [], undefined, { dueDate: '2026-02-30' })!;
+		const by = (id: string) => store.tasks.find((t) => t.id === id)!;
+		expect(by(a)).toMatchObject({ dueDate: '2026-11-12', repeat: 'weekly' });
+		expect(by(b).repeat).toBeUndefined();
+		expect(by(c).dueDate).toBeUndefined();
+	});
+
+	it('clearing the deadline also clears the repeat', () => {
+		const { store } = fresh();
+		const id = store.add('a', 'easy', [], undefined, { dueDate: '2026-11-12', repeat: 'daily' })!;
+		store.update(id, { dueDate: null });
+		expect(store.tasks[0].dueDate).toBeUndefined();
+		expect(store.tasks[0].repeat).toBeUndefined();
+	});
+
+	it('changing only the repeat keeps the deadline', () => {
+		const { store } = fresh();
+		const id = store.add('a', 'easy', [], undefined, { dueDate: '2026-11-12' })!;
+		store.update(id, { repeat: 'monthly' });
+		expect(store.tasks[0]).toMatchObject({ dueDate: '2026-11-12', repeat: 'monthly' });
+	});
+
+	it('completing a recurring task creates the next one', () => {
+		const { store } = fresh();
+		const id = store.add('water', 'easy', ['home'], undefined, {
+			dueDate: '2026-11-10',
+			repeat: 'weekly'
+		})!;
+		store.toggle(id);
+		expect(store.tasks).toHaveLength(2);
+		const next = store.tasks[1];
+		expect(next).toMatchObject({
+			title: 'water',
+			tags: ['home'],
+			done: false,
+			dueDate: '2026-11-17',
+			repeat: 'weekly'
+		});
+		expect(store.tasks[0].spawnedId).toBe(next.id);
+	});
+
+	it('a late recurring task comes back after today, not in the past', () => {
+		const { store } = fresh();
+		const id = store.add('late', 'easy', [], undefined, {
+			dueDate: '2026-11-01',
+			repeat: 'daily'
+		})!;
+		store.toggle(id);
+		expect(store.tasks[1].dueDate).toBe('2026-11-11');
+	});
+
+	it('the next occurrence keeps the workspace and starts with unticked subtasks', () => {
+		const { store } = fresh();
+		const w = store.addWorkspace('Home');
+		const wid = 'id' in w ? w.id : '';
+		const id = store.add('clean', 'medium', [], wid, { dueDate: '2026-11-10', repeat: 'daily' })!;
+		store.addItem(id, 'kitchen');
+		store.toggleItem(id, store.tasks[0].items[0].id);
+		const next = store.tasks[1];
+		expect(next.workspaceId).toBe(wid);
+		expect(next.items).toHaveLength(1);
+		expect(next.items[0]).toMatchObject({ title: 'kitchen', done: false });
+		expect(next.items[0].id).not.toBe(store.tasks[0].items[0].id);
+	});
+
+	it('undoing removes an untouched next occurrence, and redoing makes a single new one', () => {
+		const { store } = fresh();
+		const id = store.add('a', 'easy', [], undefined, { dueDate: '2026-11-10', repeat: 'daily' })!;
+		store.toggle(id);
+		store.toggle(id);
+		expect(store.tasks).toHaveLength(1);
+		expect(store.tasks[0].spawnedId).toBeUndefined();
+		store.toggle(id);
+		expect(store.tasks).toHaveLength(2);
+	});
+
+	it('undoing keeps a next occurrence that was already used, and never makes a second', () => {
+		const { store } = fresh();
+		const id = store.add('a', 'easy', [], undefined, { dueDate: '2026-11-10', repeat: 'daily' })!;
+		store.toggle(id);
+		store.toggle(store.tasks[1].id);
+		store.toggle(id);
+		store.toggle(id);
+		expect(store.tasks.filter((t) => t.title === 'a' && t.dueDate === '2026-11-11')).toHaveLength(
+			1
+		);
+		expect(store.tasks).toHaveLength(3);
+	});
+
+	it('a task without a repeat creates nothing', () => {
+		const { store } = fresh();
+		const id = store.add('a', 'easy', [], undefined, { dueDate: '2026-11-10' })!;
+		store.toggle(id);
+		expect(store.tasks).toHaveLength(1);
+	});
+
+	it('saves and reloads activity and schedule', () => {
+		const { store, data } = fresh();
+		const id = store.add('a', 'easy', [], undefined, { dueDate: '2026-11-10', repeat: 'daily' })!;
+		store.toggle(id);
+		const { store: other } = fresh({ [STORAGE_KEY]: data.get(STORAGE_KEY)! });
+		expect(other.activity['2026-11-10']).toMatchObject({ easy: 1, xp: 10 });
+		expect(other.tasks.map((t) => t.dueDate)).toEqual(['2026-11-10', '2026-11-11']);
 	});
 });

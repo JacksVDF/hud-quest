@@ -1,6 +1,9 @@
 <script lang="ts">
 	import ComplexityPicker from './ComplexityPicker.svelte';
+	import DueFields from './DueFields.svelte';
 	import TagInput from './TagInput.svelte';
+	import type { Repeat } from '#lib/dates.ts';
+	import type { Schedule } from '#lib/tasks.ts';
 	import type { Complexity } from '#lib/xp.ts';
 	import type { Workspace } from '#lib/workspaces.ts';
 
@@ -9,7 +12,13 @@
 		disabled = false,
 		workspaces = []
 	}: {
-		onadd: (title: string, complexity: Complexity, tags: string[], workspaceId?: string) => void;
+		onadd: (
+			title: string,
+			complexity: Complexity,
+			tags: string[],
+			workspaceId?: string,
+			schedule?: Schedule
+		) => void;
 		/** When given, the form offers them (and the INBOX) as the place for the new task. */
 		workspaces?: Workspace[];
 		/** True while the task list is still loading, so nothing typed is silently dropped. */
@@ -21,13 +30,20 @@
 	let tags = $state<string[]>([]);
 	/** '' is the INBOX. */
 	let workspaceId = $state('');
+	let dueDate = $state('');
+	let repeat = $state<Repeat | ''>('');
 
 	function submit(e: SubmitEvent) {
 		e.preventDefault();
 		if (disabled || !title.trim()) return;
-		onadd(title, complexity, tags, workspaceId || undefined);
+		onadd(title, complexity, tags, workspaceId || undefined, {
+			dueDate: dueDate || undefined,
+			repeat: repeat || undefined
+		});
 		title = '';
 		tags = [];
+		dueDate = '';
+		repeat = '';
 	}
 </script>
 
@@ -45,6 +61,7 @@
 		</label>
 		<ComplexityPicker bind:value={complexity} />
 	</div>
+	<DueFields bind:dueDate bind:repeat />
 	<div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
 		<div class="flex flex-col gap-3 sm:max-w-xl sm:flex-1 sm:flex-row sm:items-start">
 			<div class="sm:max-w-sm sm:flex-1">

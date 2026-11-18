@@ -99,3 +99,8 @@ src/routes/layout.css      design tokens and shared HUD styles
 ```
 
 Imports use the `#lib/...` alias with the file extension (e.g. `#lib/xp.ts`), because SvelteKit 3 removed `$lib`.
+
+Tag git: savepoint-2026-11-18, sobre el commit 7a9cc52. El árbol de trabajo estaba limpio.
+Bundle del repo completo: ../backups/hud-quest-savepoint-2026-11-18.bundle. Lo verifiqué y está bien. Contiene todo el historial.
+Copia de archivos: ../backups/hud-quest-files-2026-11-18.tar.gz. No incluye node_modules, .git ni .dev.vars, así que no hay secretos.
+Para volver atrás: git reset --hard savepoint-2026-11-18.
