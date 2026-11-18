@@ -15,6 +15,15 @@
 	--b: #000;
 }
 
+/* Native controls (date picker icon, scrollbars, the fallback option list) follow the theme. */
+:root,
+:root[data-theme='light'] {
+	color-scheme: light;
+}
+:root[data-theme='dark'] {
+	color-scheme: dark;
+}
+
 @theme inline {
 	--color-f: var(--f);
 	--color-b: var(--b);
@@ -130,6 +139,94 @@
 	.inp::placeholder {
 		color: var(--f);
 		opacity: 0.5;
+	}
+	.inp:disabled {
+		opacity: 0.4;
+		cursor: not-allowed;
+	}
+	input[type='date'].inp::-webkit-calendar-picker-indicator {
+		cursor: pointer;
+	}
+
+	/* Dropdown (HUD _15): the system arrow is replaced by a small triangle drawn in the theme colour. */
+	select.inp {
+		appearance: none;
+		padding-right: 36px;
+		cursor: pointer;
+		font-weight: 700;
+		/* Two halves of a small triangle, 8px wide, drawn in the theme colour. */
+		background:
+			linear-gradient(45deg, transparent 50%, var(--f) 50%) calc(100% - 20px) 50% / 4px 4px
+				no-repeat,
+			linear-gradient(135deg, var(--f) 50%, transparent 50%) calc(100% - 16px) 50% / 4px 4px
+				no-repeat;
+	}
+	select.inp:disabled {
+		cursor: not-allowed;
+	}
+	/* The fallback list is drawn by the system; at least give it the theme's colours. */
+	select.inp option {
+		background: var(--b);
+		color: var(--f);
+	}
+
+	/* Browsers that can style the open list (appearance: base-select) get the HUD look all through. */
+	@supports (appearance: base-select) {
+		select.inp,
+		select.inp::picker(select) {
+			appearance: base-select;
+		}
+		select.inp {
+			display: flex;
+			align-items: center;
+			justify-content: space-between;
+			gap: 12px;
+			padding-right: 12px;
+			background: transparent;
+		}
+		select.inp::picker-icon {
+			content: '▾';
+			font-size: 14px;
+			transition: rotate 0.15s;
+		}
+		select.inp:open::picker-icon {
+			rotate: 180deg;
+		}
+		select.inp::picker(select) {
+			margin-top: 4px;
+			padding: 0;
+			border: 2px solid var(--f);
+			background: var(--b);
+			color: var(--f);
+			box-shadow: 4px 4px 0 var(--f);
+		}
+		select.inp option {
+			display: flex;
+			align-items: center;
+			min-height: 44px;
+			padding: 0 12px;
+			font-weight: 400;
+			cursor: pointer;
+		}
+		select.inp option:not(:last-child) {
+			border-bottom: 1px solid var(--f);
+		}
+		select.inp option::checkmark {
+			content: none;
+		}
+		select.inp option:checked {
+			font-weight: 700;
+		}
+		select.inp option:checked::before {
+			content: '> ';
+			white-space: pre;
+		}
+		select.inp option:hover,
+		select.inp option:focus-visible {
+			background: var(--f);
+			color: var(--b);
+			outline: none;
+		}
 	}
 
 	/* Tactile press + smooth state change for the [ ] / [X] checkboxes */

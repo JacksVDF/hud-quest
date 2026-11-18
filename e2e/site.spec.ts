@@ -59,3 +59,41 @@ test('the icon files and the social image are served as images', async ({ reques
 		expect(res.headers()['content-type'], file).toContain('image/png');
 	}
 });
+
+test('every dropdown is drawn in the HUD style, not with the system look', async ({ page }) => {
+	await page.addInitScript(() => {
+		localStorage.setItem(
+			'hud-quest-todo:tasks',
+			JSON.stringify({
+				workspaces: [{ id: 'w1', name: 'Work' }],
+				activity: {},
+				tasks: [
+					{ id: 'a', title: 'Row', complexity: 'easy', done: false, tags: [], items: [], notes: '' }
+				]
+			})
+		);
+	});
+	await page.goto('/');
+	await expect(page.getByText('loading…')).toHaveCount(0);
+	// The repeat menu, the workspace menu of the form and the "move to" menu of the row.
+	const selects = page.locator('select');
+	await expect(selects).toHaveCount(3);
+	for (const select of await selects.all()) {
+		const style = await select.evaluate((el) => {
+			const s = getComputedStyle(el);
+			return { appearance: s.appearance, border: s.borderTopWidth, weight: s.fontWeight };
+		});
+		expect(style.appearance).not.toBe('auto');
+		expect(style.border).toBe('2px');
+		expect(Number(style.weight)).toBeGreaterThanOrEqual(700);
+	}
+});
+
+test('the date picker and the dropdowns follow the dark theme', async ({ page }) => {
+	await page.addInitScript(() => localStorage.setItem('hud-quest-todo:theme', 'dark'));
+	await page.goto('/');
+	await expect(page.getByText('loading…')).toHaveCount(0);
+	expect(await page.evaluate(() => getComputedStyle(document.documentElement).colorScheme)).toBe(
+		'dark'
+	);
+});
