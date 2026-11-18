@@ -104,6 +104,32 @@ test('moves a task between a workspace and the INBOX', async ({ page }) => {
 	await expect(page.getByText('No tasks here yet')).toBeVisible();
 });
 
+test('moves a task straight from its row, without opening the editor', async ({ page }) => {
+	await createWorkspace(page, 'Work');
+	await addTask(page, 'Quick move');
+	const select = page.getByRole('combobox', { name: 'Move "Quick move" to' });
+	await expect(select).toHaveValue('');
+	expect((await select.boundingBox())!.height).toBe(
+		(await page.getByRole('button', { name: 'Edit "Quick move"' }).boundingBox())!.height
+	);
+	await select.selectOption({ label: 'Work' });
+	await expect(page.getByText('Moved to Work.')).toBeVisible();
+	await expect(page.getByText('Quick move')).toHaveCount(0);
+	await expect(card(page, 'Work')).toContainText('1 open');
+
+	await openCard(page, 'Work');
+	const inside = page.getByRole('combobox', { name: 'Move "Quick move" to' });
+	await expect(inside).toHaveValue(/.+/);
+	await inside.selectOption({ label: 'INBOX' });
+	await expect(page.getByText('Moved to INBOX.')).toBeVisible();
+	await expect(page.getByText('No tasks here yet')).toBeVisible();
+});
+
+test('the row selector is not shown when there are no workspaces', async ({ page }) => {
+	await addTask(page, 'Alone');
+	await expect(page.getByRole('combobox', { name: /Move "Alone" to/ })).toHaveCount(0);
+});
+
 test('the INBOX card opens a focused view that cannot be renamed or deleted', async ({ page }) => {
 	await addTask(page, 'In the inbox');
 	await openCard(page, 'INBOX');

@@ -131,7 +131,21 @@
 				{isProject && task.items.length > 0 ? `+${earned}/${maxXp}` : `+${maxXp}`} XP
 			</span>
 			<span class="tag">{task.complexity.toUpperCase()}</span>
-			<div class="flex gap-2">
+			<div class="flex flex-wrap gap-2">
+				{#if onmove && workspaces.length > 0}
+					<!-- Shows where the task is; choosing another place moves it without opening the editor. -->
+					<select
+						class="inp w-auto max-w-40 cursor-pointer"
+						value={task.workspaceId ?? ''}
+						aria-label={`Move "${task.title}" to`}
+						onchange={(e) => onmove(task.id, e.currentTarget.value || undefined)}
+					>
+						<option value="">INBOX</option>
+						{#each workspaces as w (w.id)}
+							<option value={w.id}>{w.name}</option>
+						{/each}
+					</select>
+				{/if}
 				<button type="button" class="btn o" onclick={startEdit} aria-label={`Edit "${task.title}"`}>
 					EDIT
 				</button>

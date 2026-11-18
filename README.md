@@ -11,7 +11,7 @@ npm run db:migrate:local   # create the local D1 tables
 npm run dev        # development server
 npm run build      # Cloudflare Worker + assets in .svelte-kit/cloudflare
 npx wrangler dev   # run the built Worker locally (workerd + local D1)
-npm run deploy     # build and deploy to Cloudflare (needs `npx wrangler login` once)
+npm run deploy     # build, deploy to Cloudflare, then smoke-test the live site (needs `npx wrangler login` once)
 ```
 
 ## Deploy checklist
@@ -20,7 +20,7 @@ npm run deploy     # build and deploy to Cloudflare (needs `npx wrangler login` 
 2. `npm run db:migrate:remote` (applies the files in `migrations/` to the real D1 database)
 3. `npx wrangler secret put BETTER_AUTH_SECRET` (a long random value; never commit it)
 4. `npm run deploy`
-5. `npm run smoke` (checks the live site with a throwaway account that it deletes at the end; pass another URL as `npm run smoke -- https://...`)
+   `npm run deploy` already ends with `npm run smoke`, which checks the live site with a throwaway account that it deletes at the end. Run it alone, or against another URL, with `npm run smoke -- https://...`.
 
 `BETTER_AUTH_URL` is optional; without it the app uses the URL of each request.
 
@@ -50,7 +50,7 @@ npm run test:e2e   # browser tests (Playwright, builds the app and uses installe
 
 **Tags and filters:** up to 3 tags per task (20 characters each, lowercased). Filter the list by status (all/open/done) and by tags; selecting several tags shows tasks that have all of them. Filters reset on reload. The list shows 10 tasks per page, with numbered page buttons.
 
-**Workspaces:** the home page shows a card per workspace (name, open and done tasks, progress bar) plus an `INBOX` card. Tasks without a workspace live in the INBOX, whose list is also shown under the cards. Each card opens `/w/<id>` with that workspace's tasks, its own filters and pagination, and the number of pending tasks. Up to 10 workspaces, with a name of 1–30 characters that is unique regardless of case (`INBOX` is reserved). A task is created in the workspace you are in, or you pick one in the form on the home page, and you can move it from its edit form. Level and XP are global: they add up all workspaces. Deleting a workspace asks first and sends its tasks to the trash.
+**Workspaces:** the home page shows a card per workspace (name, open and done tasks, progress bar) plus an `INBOX` card. Tasks without a workspace live in the INBOX, whose list is also shown under the cards. Each card opens `/w/<id>` with that workspace's tasks, its own filters and pagination, and the number of pending tasks. Up to 10 workspaces, with a name of 1–30 characters that is unique regardless of case (`INBOX` is reserved). A task is created in the workspace you are in, or you pick one in the form on the home page. Every task row has a selector that shows where it is and moves it with one choice; the edit form has one too. Level and XP are global: they add up all workspaces. Deleting a workspace asks first and sends its tasks to the trash.
 
 **One "ten":** 10 is a single rule in the code (`PAGE_SIZE`): tasks per page, trash rows per page, and the most workspaces a user can have.
 
