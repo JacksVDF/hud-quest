@@ -55,17 +55,17 @@
 }
 
 @layer components {
-	/* Corner brackets, 12px arms, 2px thick */
+	/* Corner brackets, 20px arms, 2px thick */
 	.brk {
 		background:
-			linear-gradient(var(--f), var(--f)) top left / 12px 2px no-repeat,
-			linear-gradient(var(--f), var(--f)) top left / 2px 12px no-repeat,
-			linear-gradient(var(--f), var(--f)) top right / 12px 2px no-repeat,
-			linear-gradient(var(--f), var(--f)) top right / 2px 12px no-repeat,
-			linear-gradient(var(--f), var(--f)) bottom left / 12px 2px no-repeat,
-			linear-gradient(var(--f), var(--f)) bottom left / 2px 12px no-repeat,
-			linear-gradient(var(--f), var(--f)) bottom right / 12px 2px no-repeat,
-			linear-gradient(var(--f), var(--f)) bottom right / 2px 12px no-repeat;
+			linear-gradient(var(--f), var(--f)) top left / 20px 2px no-repeat,
+			linear-gradient(var(--f), var(--f)) top left / 2px 20px no-repeat,
+			linear-gradient(var(--f), var(--f)) top right / 20px 2px no-repeat,
+			linear-gradient(var(--f), var(--f)) top right / 2px 20px no-repeat,
+			linear-gradient(var(--f), var(--f)) bottom left / 20px 2px no-repeat,
+			linear-gradient(var(--f), var(--f)) bottom left / 2px 20px no-repeat,
+			linear-gradient(var(--f), var(--f)) bottom right / 20px 2px no-repeat,
+			linear-gradient(var(--f), var(--f)) bottom right / 2px 20px no-repeat;
 	}
 	.gl {
 		background: var(--hud-gradient);
@@ -248,6 +248,23 @@
 	}
 	.chk:active:not(:disabled) {
 		transform: scale(0.88);
+	}
+	/* When the button also holds the title, only the DO IT chip gets the press, not the whole row. */
+	.chk:has(.chip) {
+		transition: none;
+	}
+	.chk:has(.chip):active:not(:disabled) {
+		transform: none;
+	}
+	.chk:has(.chip):active:not(:disabled) .chip {
+		transform: scale(0.88);
+	}
+	.chip {
+		transition:
+			transform 0.1s,
+			background-color 0.15s,
+			color 0.15s,
+			opacity 0.2s;
 	}
 
 	.tag {

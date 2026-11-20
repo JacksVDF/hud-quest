@@ -19,7 +19,7 @@ async function fillAndSubmit(page: Page, email: string, password: string, button
 async function signUp(page: Page, email: string) {
 	await page.goto('/signup');
 	await fillAndSubmit(page, email, PASSWORD, /CREATE ACCOUNT/);
-	await expect(page.getByTestId('account-email')).toHaveText(email.toLowerCase());
+	await expect(page.getByTestId('account-email')).toHaveText(email.toLowerCase().split('@')[0]);
 }
 
 test('guests see LOGIN in the header', async ({ page }) => {
@@ -33,7 +33,7 @@ test('signs up, shows the email, and stays signed in after a reload', async ({ p
 	await signUp(page, email);
 	await expect(page).toHaveURL('/');
 	await page.reload();
-	await expect(page.getByTestId('account-email')).toHaveText(email);
+	await expect(page.getByTestId('account-email')).toHaveText(email.split('@')[0]);
 });
 
 test('logs out and logs back in', async ({ page }) => {
@@ -45,7 +45,7 @@ test('logs out and logs back in', async ({ page }) => {
 
 	await page.getByRole('link', { name: 'LOGIN' }).click();
 	await fillAndSubmit(page, email, PASSWORD, /LOGIN >/);
-	await expect(page.getByTestId('account-email')).toHaveText(email);
+	await expect(page.getByTestId('account-email')).toHaveText(email.split('@')[0]);
 });
 
 test('shows a generic error for a wrong password', async ({ page }) => {
@@ -356,4 +356,23 @@ test('the header fits a phone when signed in, with every control reachable', asy
 	// A narrower phone, and an address that is as long as it can be.
 	await page.setViewportSize({ width: 320, height: 700 });
 	expect(await fits()).toBe(true);
+});
+
+test('a long address shows its user name whole, never cut with dots', async ({ page }) => {
+	await page.setViewportSize({ width: 320, height: 700 });
+	const user = `long-${Date.now()}-${'x'.repeat(40)}`;
+	await signUp(page, `${user}@example.com`);
+	const link = page.getByTestId('account-email');
+	await expect(link).toHaveText(user);
+	await expect(link).toHaveAttribute('title', new RegExp(`${user}@example.com`));
+	const box = (await link.boundingBox())!;
+	expect(box.x + box.width).toBeLessThanOrEqual(320);
+	expect(
+		await page.evaluate(
+			() => document.documentElement.scrollWidth <= document.documentElement.clientWidth
+		)
+	).toBe(true);
+	// The account page still shows the full address.
+	await link.click();
+	await expect(page.getByTestId('account-page-email')).toContainText(`${user}@example.com`);
 });

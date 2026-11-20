@@ -287,31 +287,37 @@
 							}}
 							ondragend={() => (dragging = over = null)}
 						>
-							<!-- The whole title gets its own line, so a long one is never squeezed by the controls. -->
-							<div class="flex items-start gap-3">
-								<button
-									type="button"
-									role="checkbox"
-									aria-checked={task.done}
-									aria-label={task.done
-										? `Reopen "${task.title}" from the calendar`
-										: `Finish "${task.title}" from the calendar`}
-									title={gated ? 'Completes automatically when every item is done' : undefined}
-									class="chk inline-flex h-10 shrink-0 items-center gap-2 border-2 border-f px-2 text-xs font-bold {task.done
+							<!-- The button and the title are one control. The title has its own line, so a long one is
+							     never squeezed by the controls. -->
+							<button
+								type="button"
+								role="checkbox"
+								aria-checked={task.done}
+								aria-label={task.done
+									? `Reopen "${task.title}" from the calendar`
+									: `Finish "${task.title}" from the calendar`}
+								title={gated ? 'Completes automatically when every item is done' : undefined}
+								class="chk group flex w-full items-start gap-3 text-left {gated
+									? 'cursor-not-allowed'
+									: ''}"
+								disabled={gated}
+								onclick={() => toggle(task.id)}
+							>
+								<span
+									class="chip inline-flex h-10 shrink-0 items-center gap-2 border-2 border-f px-2 text-xs font-bold {task.done
 										? 'bg-f text-b'
 										: ''} {gated
-										? 'cursor-not-allowed opacity-50'
+										? 'opacity-50'
 										: task.done
 											? ''
-											: 'hover:bg-f hover:text-b'}"
-									disabled={gated}
-									onclick={() => toggle(task.id)}
+											: 'group-hover:bg-f group-hover:text-b'}"
+									aria-hidden="true"
 								>
-									<span aria-hidden="true">{task.done ? '[X]' : '[ ]'}</span>
-									<span aria-hidden="true">{gated ? 'AUTO' : task.done ? 'UNDO' : 'DO IT'}</span>
-								</button>
+									<span>{task.done ? '[X]' : '[ ]'}</span>
+									<span>{gated ? 'AUTO' : task.done ? 'UNDO' : 'DO IT'}</span>
+								</span>
 								<span class="wrap flex-1 pt-2" class:line-through={task.done}>{task.title}</span>
-							</div>
+							</button>
 							<div class="flex flex-wrap items-center gap-2">
 								<span class="tag">{task.complexity.toUpperCase()}</span>
 								<span class="tag" data-testid="day-task-place">{taskStore.originOf(task)}</span>

@@ -110,7 +110,7 @@ test('a signed-in user never has account data stored on the device', async ({ pa
 	await page.getByLabel('EMAIL_').fill(email);
 	await page.getByLabel('PASSWORD_').fill(PASSWORD);
 	await page.getByRole('button', { name: /CREATE ACCOUNT/ }).click();
-	await expect(page.getByTestId('account-email')).toHaveText(email);
+	await expect(page.getByTestId('account-email')).toHaveText(email.split('@')[0]);
 
 	await page.getByLabel('NEW_TASK_').fill('Secret quest');
 	await page.getByRole('button', { name: /^ADD >/ }).click();
@@ -139,7 +139,7 @@ test('a signed-in user opening the app offline gets a notice, not the guest view
 	await page.getByLabel('EMAIL_').fill(email);
 	await page.getByLabel('PASSWORD_').fill(PASSWORD);
 	await page.getByRole('button', { name: /CREATE ACCOUNT/ }).click();
-	await expect(page.getByTestId('account-email')).toHaveText(email);
+	await expect(page.getByTestId('account-email')).toHaveText(email.split('@')[0]);
 
 	await context.setOffline(true);
 	await page.reload();
@@ -151,7 +151,7 @@ test('a signed-in user opening the app offline gets a notice, not the guest view
 	// Back online, the account comes back by itself.
 	await context.setOffline(false);
 	await page.evaluate(() => window.dispatchEvent(new Event('online')));
-	await expect(page.getByTestId('account-email')).toHaveText(email);
+	await expect(page.getByTestId('account-email')).toHaveText(email.split('@')[0]);
 	await expect(page.getByTestId('offline-blocked')).toHaveCount(0);
 });
 
@@ -165,7 +165,7 @@ test('a signed-in user who goes offline sees a notice and the list stays on scre
 	await page.getByLabel('EMAIL_').fill(email);
 	await page.getByLabel('PASSWORD_').fill(PASSWORD);
 	await page.getByRole('button', { name: /CREATE ACCOUNT/ }).click();
-	await expect(page.getByTestId('account-email')).toHaveText(email);
+	await expect(page.getByTestId('account-email')).toHaveText(email.split('@')[0]);
 	await page.getByLabel('NEW_TASK_').fill('On screen');
 	await page.getByRole('button', { name: /^ADD >/ }).click();
 	await expect(page.getByText('On screen')).toBeVisible();

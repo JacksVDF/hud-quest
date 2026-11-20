@@ -126,33 +126,32 @@
 			</div>
 		</form>
 	{:else}
-		<!-- The title has its own line next to the button, so a long one is never squeezed by the
-		     labels and actions, which sit below it and wrap on their own. -->
-		<div class="flex items-start gap-3">
-			<button
-				type="button"
-				role="checkbox"
-				aria-checked={task.done}
-				aria-disabled={gated}
-				aria-label={task.done ? `Mark "${task.title}" as not done` : `Mark "${task.title}" as done`}
-				title={gated
-					? 'Completes automatically when every item is done'
-					: task.done
-						? 'Click to reopen'
-						: 'Click to complete'}
-				class="chk inline-flex h-11 shrink-0 items-center gap-2 border-2 border-f px-3 text-xs font-bold {task.done
+		<!-- The button and the title are one control, so the focus ring wraps the whole row. The title
+		     has its own line, so a long one is never squeezed by the labels and actions below it. -->
+		<button
+			type="button"
+			role="checkbox"
+			aria-checked={task.done}
+			aria-disabled={gated}
+			aria-label={task.done ? `Mark "${task.title}" as not done` : `Mark "${task.title}" as done`}
+			title={gated
+				? 'Completes automatically when every item is done'
+				: task.done
+					? 'Click to reopen'
+					: 'Click to complete'}
+			class="chk group flex w-full items-start gap-3 text-left {gated ? 'cursor-not-allowed' : ''}"
+			disabled={gated}
+			onclick={() => ontoggle(task.id)}
+		>
+			<span
+				class="chip inline-flex h-11 shrink-0 items-center gap-2 border-2 border-f px-3 text-xs font-bold {task.done
 					? 'bg-f text-b'
-					: ''} {gated
-					? 'cursor-not-allowed opacity-50'
-					: task.done
-						? ''
-						: 'hover:bg-f hover:text-b'}"
-				disabled={gated}
-				onclick={() => ontoggle(task.id)}
+					: ''} {gated ? 'opacity-50' : task.done ? '' : 'group-hover:bg-f group-hover:text-b'}"
+				aria-hidden="true"
 			>
-				<span aria-hidden="true" class="text-sm">{task.done ? '[X]' : '[ ]'}</span>
-				<span aria-hidden="true">{gated ? 'AUTO' : task.done ? 'UNDO' : 'DO IT'}</span>
-			</button>
+				<span class="text-sm">{task.done ? '[X]' : '[ ]'}</span>
+				<span>{gated ? 'AUTO' : task.done ? 'UNDO' : 'DO IT'}</span>
+			</span>
 			<span
 				class="wrap flex-1 pt-2.5 transition-opacity duration-200"
 				class:line-through={task.done}
@@ -160,7 +159,7 @@
 			>
 				{task.title}
 			</span>
-		</div>
+		</button>
 
 		<!-- Labels and actions share a row when there is room and wrap apart when there is not. -->
 		<div class="mt-3 flex flex-wrap items-center justify-between gap-x-4 gap-y-3">
