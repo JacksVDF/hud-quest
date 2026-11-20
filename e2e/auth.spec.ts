@@ -335,3 +335,25 @@ test('the export button is not offered to guests', async ({ page }) => {
 	await expect(page.getByText('You are not signed in.')).toBeVisible();
 	await expect(page.getByTestId('export')).toHaveCount(0);
 });
+
+test('the header fits a phone when signed in, with every control reachable', async ({ page }) => {
+	await page.setViewportSize({ width: 360, height: 800 });
+	await signUp(page, uniqueEmail());
+	const fits = () =>
+		page.evaluate(
+			() => document.documentElement.scrollWidth <= document.documentElement.clientWidth
+		);
+	expect(await fits()).toBe(true);
+	for (const control of [
+		page.getByTestId('account-email'),
+		page.getByRole('button', { name: 'LOGOUT' }),
+		page.getByRole('button', { name: 'Toggle light/dark theme' })
+	]) {
+		const box = (await control.boundingBox())!;
+		expect(box.x).toBeGreaterThanOrEqual(0);
+		expect(box.x + box.width).toBeLessThanOrEqual(360);
+	}
+	// A narrower phone, and an address that is as long as it can be.
+	await page.setViewportSize({ width: 320, height: 700 });
+	expect(await fits()).toBe(true);
+});
