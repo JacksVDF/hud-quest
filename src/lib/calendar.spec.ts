@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
 	canShift,
+	canShiftWeek,
 	cellMark,
 	describeDay,
 	longDay,
@@ -9,7 +10,10 @@ import {
 	monthTitle,
 	shiftMonth,
 	tallyByDay,
-	tasksOn
+	tasksOn,
+	weekGrid,
+	weekStartOf,
+	weekTitle
 } from './calendar';
 import { weekdayOf } from './dates';
 import type { Task } from './tasks';
@@ -134,5 +138,43 @@ describe('cell text', () => {
 		expect(describeDay('2026-11-18', { open: 2, done: 1, overdue: 1 })).toBe(
 			'November 18, 2026: 2 open, 1 overdue, 1 done'
 		);
+	});
+});
+
+describe('weeks', () => {
+	it('finds the Monday of any day', () => {
+		expect(weekStartOf('2026-11-18')).toBe('2026-11-16'); // Wednesday
+		expect(weekStartOf('2026-11-16')).toBe('2026-11-16'); // Monday
+		expect(weekStartOf('2026-11-22')).toBe('2026-11-16'); // Sunday
+		expect(weekStartOf('2026-11-01')).toBe('2026-10-26'); // crosses the month
+		expect(weekStartOf('2027-01-01')).toBe('2026-12-28'); // crosses the year
+	});
+
+	it('lists seven days from Monday', () => {
+		const week = weekGrid('2026-11-30');
+		expect(week).toEqual([
+			'2026-11-30',
+			'2026-12-01',
+			'2026-12-02',
+			'2026-12-03',
+			'2026-12-04',
+			'2026-12-05',
+			'2026-12-06'
+		]);
+		expect(new Set(weekGrid('2026-03-23')).size).toBe(7);
+	});
+
+	it('does not leave the supported years', () => {
+		expect(canShiftWeek('1900-01-01', 1)).toBe(true);
+		expect(canShiftWeek('1900-01-01', -1)).toBe(false);
+		expect(canShiftWeek('2099-12-22', 1)).toBe(false);
+		expect(canShiftWeek('2099-12-22', -1)).toBe(true);
+	});
+
+	it('titles a week, adding the month or year only when needed', () => {
+		expect(weekTitle('2026-11-16', '2026-11-18')).toBe('NOV 16 - 22');
+		expect(weekTitle('2026-11-30', '2026-11-18')).toBe('NOV 30 - DEC 6');
+		expect(weekTitle('2026-12-28', '2026-11-18')).toBe('DEC 28 2026 - JAN 3 2027');
+		expect(weekTitle('2027-02-01', '2026-11-18')).toBe('FEB 1 - 7 2027');
 	});
 });

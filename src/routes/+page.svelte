@@ -68,7 +68,7 @@
 		{/snippet}
 	</AppHeader>
 
-	<main class="mt-8 flex flex-col gap-8">
+	<main class="mt-8 flex flex-col gap-10">
 		<h1 class="h text-4xl sm:text-5xl">_TASKS;</h1>
 
 		<Welcome
@@ -96,7 +96,7 @@
 			onadd={addTask}
 		/>
 
-		<section aria-labelledby="workspaces-title" class="flex flex-col gap-4">
+		<section aria-labelledby="workspaces-title" class="sect flex flex-col gap-4">
 			<h2 id="workspaces-title" class="h text-2xl">
 				_WORKSPACES; <span class="text-sm font-normal"
 					>{taskStore.workspaces.length}/{MAX_WORKSPACES}</span

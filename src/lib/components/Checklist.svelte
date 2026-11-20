@@ -48,7 +48,7 @@
 				{item.done ? '[X]' : '[ ]'}
 			</button>
 			<span
-				class="min-w-0 flex-1 text-sm break-words transition-opacity duration-200"
+				class="wrap flex-1 text-sm transition-opacity duration-200"
 				class:line-through={item.done}
 				class:opacity-75={item.done}
 			>
@@ -73,6 +73,7 @@
 		maxlength="120"
 		placeholder="new {noun}"
 		aria-label="New {noun}"
+		autocomplete="off"
 	/>
 	<button type="submit" class="btn sm" disabled={!draft.trim()}>ADD</button>
 </form>

@@ -25,6 +25,8 @@ const MONTH_NAMES = [
 /** The calendar never leaves the years that saved dates are allowed to have. */
 const FIRST_MONTH = '1900-01';
 const LAST_MONTH = '2099-12';
+const FIRST_DAY = '1900-01-01';
+const LAST_DAY = '2099-12-31';
 
 export const monthOf = (day: string) => day.slice(0, 7);
 
@@ -60,6 +62,46 @@ export function monthGrid(month: string): string[] {
 	const first = `${month}-01`;
 	const start = addDays(first, -weekdayOf(first));
 	return Array.from({ length: 42 }, (_, i) => addDays(start, i));
+}
+
+/** The Monday of the week a day falls in. */
+export const weekStartOf = (day: string) => addDays(day, -weekdayOf(day));
+
+/** The seven days of the week that starts on `start` (a Monday). */
+export function weekGrid(start: string): string[] {
+	return Array.from({ length: 7 }, (_, i) => addDays(start, i));
+}
+
+/** False when going `n` weeks away would leave the supported years. */
+export function canShiftWeek(start: string, n: number): boolean {
+	const first = addDays(start, 7 * n);
+	return first >= FIRST_DAY && addDays(first, 6) <= LAST_DAY;
+}
+
+const SHORT_MONTHS = [
+	'JAN',
+	'FEB',
+	'MAR',
+	'APR',
+	'MAY',
+	'JUN',
+	'JUL',
+	'AUG',
+	'SEP',
+	'OCT',
+	'NOV',
+	'DEC'
+];
+
+/** `NOV 16 - 22`, or `NOV 30 - DEC 6` when the week crosses a month, with the year when it differs. */
+export function weekTitle(start: string, today: string): string {
+	const end = addDays(start, 6);
+	const [y1, m1, d1] = start.split('-').map(Number);
+	const [y2, m2, d2] = end.split('-').map(Number);
+	const year = y1 === Number(today.slice(0, 4)) && y2 === y1 ? '' : ` ${y2}`;
+	if (y1 === y2 && m1 === m2) return `${SHORT_MONTHS[m1 - 1]} ${d1} - ${d2}${year}`;
+	const first = y1 === y2 ? '' : ` ${y1}`;
+	return `${SHORT_MONTHS[m1 - 1]} ${d1}${first} - ${SHORT_MONTHS[m2 - 1]} ${d2}${year}`;
 }
 
 export type DayTally = { open: number; done: number; overdue: number };

@@ -70,6 +70,16 @@
 	.gl {
 		background: var(--hud-gradient);
 	}
+	/* Long names with no spaces (addresses, pasted text) wrap instead of pushing the layout wider. */
+	.wrap {
+		min-width: 0;
+		overflow-wrap: anywhere;
+	}
+	/* A section of a page: a light rule above it and room to breathe, so sections read apart. */
+	.sect {
+		border-top: 2px solid color-mix(in srgb, var(--f) 25%, transparent);
+		padding-top: 2rem;
+	}
 	.h {
 		font-family: 'Chakra Petch', sans-serif;
 		font-weight: 700;

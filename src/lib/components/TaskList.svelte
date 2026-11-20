@@ -78,7 +78,7 @@
 	}
 </script>
 
-<section aria-labelledby="list-title" class="flex flex-col gap-4">
+<section aria-labelledby="list-title" class="sect flex flex-col gap-4">
 	<h2 id="list-title" class="h text-2xl">
 		{title} <span class="text-sm font-normal">{doneCount}/{tasks.length}</span>
 	</h2>

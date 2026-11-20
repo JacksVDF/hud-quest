@@ -85,7 +85,7 @@
 		{/snippet}
 	</AppHeader>
 
-	<main class="mt-8 flex flex-col gap-8">
+	<main class="mt-8 flex flex-col gap-10">
 		<a class="text-sm underline" href={resolve('/')}>&lt; ALL WORKSPACES</a>
 
 		{#if taskStore.loaded && known}

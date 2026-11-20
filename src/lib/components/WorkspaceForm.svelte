@@ -30,6 +30,7 @@
 				bind:value={name}
 				oninput={() => (error = '')}
 				placeholder="e.g. Home"
+				autocomplete="off"
 				maxlength={MAX_WORKSPACE_NAME}
 				required
 			/>

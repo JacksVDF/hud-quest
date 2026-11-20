@@ -40,7 +40,7 @@
 {#if tasks.length > 0}
 	<section
 		aria-labelledby="trash-title"
-		class="flex flex-col gap-4"
+		class="sect flex flex-col gap-4"
 		data-testid="trash"
 		transition:slide={{ duration: ms(MOTION.enter) }}
 	>
@@ -82,7 +82,7 @@
 							}}
 						>
 							<div class="flex min-w-0 flex-1 flex-col gap-1">
-								<span class="break-words opacity-75">{task.title}</span>
+								<span class="wrap opacity-75">{task.title}</span>
 								<span class="text-xs opacity-75">from {originOf(task)}</span>
 								{#if task.tags.length > 0}
 									<ul class="flex flex-wrap gap-1 opacity-75" aria-label="Tags">

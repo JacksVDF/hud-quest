@@ -37,7 +37,7 @@
 
 <div class="flex flex-col gap-3">
 	<div class="flex flex-wrap items-baseline gap-x-4 gap-y-1">
-		<h1 class="h text-4xl break-words sm:text-5xl" data-testid="workspace-name">{name}</h1>
+		<h1 class="h wrap text-4xl sm:text-5xl" data-testid="workspace-name">{name}</h1>
 		<span class="text-sm" data-testid="workspace-pending">{open} pending</span>
 	</div>
 
@@ -59,6 +59,7 @@
 							bind:value={draft}
 							oninput={() => (error = '')}
 							maxlength={MAX_WORKSPACE_NAME}
+							autocomplete="off"
 							required
 						/>
 					</label>

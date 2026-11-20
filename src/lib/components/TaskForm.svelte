@@ -54,7 +54,7 @@
 	}
 </script>
 
-<form class="flex flex-col gap-4" onsubmit={submit}>
+<form class="sect flex flex-col gap-4" onsubmit={submit}>
 	<div class="flex flex-col gap-3 sm:flex-row sm:items-end">
 		<label class="flex-1 text-xs">
 			NEW_TASK_
@@ -62,6 +62,7 @@
 				class="inp mt-1"
 				bind:value={title}
 				bind:this={titleEl}
+				autocomplete="off"
 				placeholder="write here"
 				maxlength="120"
 				required

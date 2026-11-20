@@ -12,7 +12,7 @@
 	data-testid="workspace-card"
 	aria-label="Open {name}: {stats.open} open, {stats.done} done"
 >
-	<span class="h text-xl break-words">{name}</span>
+	<span class="h wrap text-xl">{name}</span>
 	<span class="text-xs">{stats.open} open · {stats.done} done</span>
 	<ProgressBar value={stats.done} max={stats.total} label="{name} progress" compact />
 </a>

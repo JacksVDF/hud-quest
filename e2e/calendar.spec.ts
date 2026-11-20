@@ -303,3 +303,153 @@ test('each workspace page starts on today, with its own month', async ({ page })
 	await expect(page.getByTestId('month-title')).not.toHaveText(moved!);
 	await expect(cell(page, await day(page, 0))).toHaveAttribute('aria-pressed', 'true');
 });
+
+const weekdayOf = (iso: string) => (new Date(`${iso}T12:00:00`).getDay() + 6) % 7;
+
+test('starts on the month on wide screens and on the week on phones', async ({ page, browser }) => {
+	await expect(page.getByTestId('calendar')).toHaveAttribute('data-view', 'month');
+	await expect(page.getByTestId('day')).toHaveCount(42);
+
+	const phone = await browser.newContext({
+		viewport: { width: 380, height: 800 },
+		storageState: await page.context().storageState()
+	});
+	const small = await phone.newPage();
+	await small.goto('/');
+	await expect(small.getByTestId('calendar')).toHaveAttribute('data-view', 'week');
+	await expect(small.getByTestId('day')).toHaveCount(7);
+	await expect(small.getByTestId('view-week')).toHaveAttribute('aria-pressed', 'true');
+	await phone.close();
+});
+
+test('the week view shows seven days from Monday, with today and its tasks', async ({ page }) => {
+	const today = await day(page, 0);
+	await addTask(page, 'this week', today);
+	await page.getByTestId('view-week').click();
+	await expect(page.getByTestId('calendar')).toHaveAttribute('data-view', 'week');
+	await expect(page.getByTestId('day')).toHaveCount(7);
+	const first = await page.getByTestId('day').first().getAttribute('data-day');
+	expect(weekdayOf(first!)).toBe(0);
+	await expect(cell(page, today)).toHaveAttribute('data-mark', '■1');
+	await expect(cell(page, today)).toHaveAttribute('aria-pressed', 'true');
+	await expect(panel(page)).toContainText('this week');
+});
+
+test('the week arrows move seven days and TODAY comes back', async ({ page }) => {
+	await page.getByTestId('view-week').click();
+	const first = await page.getByTestId('day').first().getAttribute('data-day');
+	await page.getByRole('button', { name: 'Next week' }).click();
+	const next = await page.getByTestId('day').first().getAttribute('data-day');
+	expect(new Date(`${next}T12:00:00`).getTime() - new Date(`${first}T12:00:00`).getTime()).toBe(
+		7 * 24 * 60 * 60 * 1000
+	);
+	await page.getByRole('button', { name: 'Previous week' }).click();
+	await page.getByRole('button', { name: 'Previous week' }).click();
+	await expect(page.getByTestId('day').first()).not.toHaveAttribute('data-day', first!);
+	await page.getByTestId('calendar-today').click();
+	await expect(page.getByTestId('day').first()).toHaveAttribute('data-day', first!);
+});
+
+test('switching view keeps the day that was picked in sight', async ({ page }) => {
+	const today = await day(page, 0);
+	await page.getByTestId('view-week').click();
+	await page.getByRole('button', { name: 'Next week' }).click();
+	await page.getByTestId('view-month').click();
+	await expect(page.getByTestId('day')).toHaveCount(42);
+	// The month that holds that week is the one shown.
+	const shownDays = await page
+		.getByTestId('day')
+		.evaluateAll((els) => els.map((e) => (e as HTMLElement).dataset.day));
+	expect(shownDays.length).toBe(42);
+	await page.getByTestId('calendar-today').click();
+	await expect(cell(page, today)).toHaveAttribute('aria-pressed', 'true');
+});
+
+test('a task can be moved to another day inside the week view', async ({ page }) => {
+	const today = await day(page, 0);
+	await addTask(page, 'week mover', today);
+	await page.getByTestId('view-week').click();
+	const target = await day(page, 0).then(async (d) => {
+		// Another day of this same week: the Monday, or the next day when today is the Monday.
+		const first = await page.getByTestId('day').first().getAttribute('data-day');
+		return first === d ? await day(page, 1) : first!;
+	});
+	await panel(page)
+		.getByLabel(/Move "week mover"/)
+		.fill(target);
+	// A day before today is late, so it is marked as such; a later one as open.
+	await expect(cell(page, target)).toHaveAttribute('data-mark', target < today ? '!1' : '■1');
+	await expect(cell(page, today)).toHaveAttribute('data-mark', '');
+});
+
+test('arrow keys cross from one week to the next', async ({ page }) => {
+	await page.getByTestId('view-week').click();
+	const last = page.getByTestId('day').last();
+	await last.focus();
+	const lastDay = await last.getAttribute('data-day');
+	await page.keyboard.press('ArrowRight');
+	await expect(page.locator(':focus')).not.toHaveAttribute('data-day', lastDay!);
+	await expect(page.getByTestId('day')).toHaveCount(7);
+});
+
+test('a very long title stays inside the screen on a phone', async ({ page }) => {
+	await page.setViewportSize({ width: 360, height: 800 });
+	const today = await day(page, 0);
+	const long = 'https://example.com/' + 'a-very-long-address-without-spaces/'.repeat(2);
+	await addTask(page, long, today);
+	const noOverflow = () =>
+		page.evaluate(
+			() => document.documentElement.scrollWidth <= document.documentElement.clientWidth
+		);
+	expect(await noOverflow()).toBe(true);
+	// Both the calendar's day list and the task list hold the full title and fit.
+	await expect(panel(page).getByTestId('day-task')).toHaveCount(1);
+	await expect(panel(page).getByRole('checkbox', { name: /Finish/ })).toBeVisible();
+	await expect(
+		page.getByRole('checkbox', { name: `Mark "${long}" as done`, exact: true })
+	).toBeVisible();
+	const row = page.locator('section[aria-labelledby="list-title"] li').first();
+	const box = (await row.boundingBox())!;
+	expect(box.x + box.width).toBeLessThanOrEqual(360);
+});
+
+test('the title of a task sits on its own line, above its labels and actions', async ({ page }) => {
+	await page.setViewportSize({ width: 360, height: 800 });
+	await addTask(
+		page,
+		'A fairly long title that needs several lines on a small screen to read well'
+	);
+	const row = page.locator('section[aria-labelledby="list-title"] li').first();
+	const titleBox = (await row.getByText(/A fairly long title/).boundingBox())!;
+	const xp = (await row.getByText('+10 XP').boundingBox())!;
+	const edit = (await row.getByRole('button', { name: /Edit/ }).boundingBox())!;
+	// The title is wide enough to read (not squeezed into a narrow column) ...
+	expect(titleBox.width).toBeGreaterThan(160);
+	// ... and the labels and the actions come after it, never beside it.
+	expect(xp.y).toBeGreaterThan(titleBox.y + titleBox.height - 1);
+	expect(edit.y).toBeGreaterThan(titleBox.y + titleBox.height - 1);
+});
+
+test('text fields do not offer the browser’s saved entries', async ({ page }) => {
+	await addTask(page, 'has parts', await day(page, 0));
+	const fields = [
+		page.getByLabel('NEW_TASK_'),
+		page.getByLabel('NEW_WORKSPACE_'),
+		page.getByLabel('TAGS_')
+	];
+	for (const field of fields) await expect(field).toHaveAttribute('autocomplete', 'off');
+	await page.getByRole('button', { name: 'Edit "has parts"' }).click();
+	await expect(page.getByLabel('Task title')).toHaveAttribute('autocomplete', 'off');
+});
+
+test('sections of the page are set apart by a rule', async ({ page }) => {
+	await addTask(page, 'x', await day(page, 0));
+	for (const selector of [
+		'[data-testid="calendar"]',
+		'section[aria-labelledby="workspaces-title"]',
+		'section[aria-labelledby="list-title"]'
+	]) {
+		const width = await page.locator(selector).evaluate((n) => getComputedStyle(n).borderTopWidth);
+		expect(width, selector).toBe('2px');
+	}
+});

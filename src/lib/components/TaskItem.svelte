@@ -99,7 +99,14 @@
 <div class="brk p-4">
 	{#if editing}
 		<form class="flex flex-col gap-3" onsubmit={save}>
-			<input class="inp" bind:value={draftTitle} maxlength="120" required aria-label="Task title" />
+			<input
+				class="inp"
+				bind:value={draftTitle}
+				maxlength="120"
+				required
+				aria-label="Task title"
+				autocomplete="off"
+			/>
 			<TagInput bind:tags={draftTags} />
 			<DueFields bind:dueDate={draftDue} bind:repeat={draftRepeat} />
 			{#if onmove && workspaces.length > 0}
@@ -119,7 +126,9 @@
 			</div>
 		</form>
 	{:else}
-		<div class="flex flex-wrap items-center gap-3">
+		<!-- The title has its own line next to the button, so a long one is never squeezed by the
+		     labels and actions, which sit below it and wrap on their own. -->
+		<div class="flex items-start gap-3">
 			<button
 				type="button"
 				role="checkbox"
@@ -145,34 +154,41 @@
 				<span aria-hidden="true">{gated ? 'AUTO' : task.done ? 'UNDO' : 'DO IT'}</span>
 			</button>
 			<span
-				class="min-w-40 flex-1 break-words transition-opacity duration-200"
+				class="wrap flex-1 pt-2.5 transition-opacity duration-200"
 				class:line-through={task.done}
 				class:opacity-75={task.done}
 			>
 				{task.title}
 			</span>
-			<span class="tag" class:s={task.done}>
-				{isProject && task.items.length > 0 ? `+${earned}/${maxXp}` : `+${maxXp}`} XP
-			</span>
-			<span class="tag">{task.complexity.toUpperCase()}</span>
-			{#if task.dueDate}
-				<span
-					class="tag due"
-					class:s={due === 'overdue' || due === 'today'}
-					data-due={due ?? 'none'}
-				>
-					{#if due === 'overdue'}OVERDUE ·{:else if due === 'today'}TODAY ·{:else}DUE{/if}
-					{formatDay(task.dueDate, clock.today)}
+		</div>
+
+		<!-- Labels and actions share a row when there is room and wrap apart when there is not. -->
+		<div class="mt-3 flex flex-wrap items-center justify-between gap-x-4 gap-y-3">
+			<div class="flex flex-wrap items-center gap-2">
+				<span class="tag" class:s={task.done}>
+					{isProject && task.items.length > 0 ? `+${earned}/${maxXp}` : `+${maxXp}`} XP
 				</span>
-			{/if}
-			{#if task.repeat}
-				<span class="tag" title="Comes back when completed">↻ {REPEAT_WORD[task.repeat]}</span>
-			{/if}
+				<span class="tag">{task.complexity.toUpperCase()}</span>
+				{#if task.dueDate}
+					<span
+						class="tag due"
+						class:s={due === 'overdue' || due === 'today'}
+						data-due={due ?? 'none'}
+					>
+						{#if due === 'overdue'}OVERDUE ·{:else if due === 'today'}TODAY ·{:else}DUE{/if}
+						{formatDay(task.dueDate, clock.today)}
+					</span>
+				{/if}
+				{#if task.repeat}
+					<span class="tag" title="Comes back when completed">↻ {REPEAT_WORD[task.repeat]}</span>
+				{/if}
+			</div>
+
 			<div class="flex flex-wrap gap-2">
 				{#if onmove && workspaces.length > 0}
 					<!-- Shows where the task is; choosing another place moves it without opening the editor. -->
 					<select
-						class="inp w-auto max-w-40 cursor-pointer"
+						class="inp w-auto max-w-full min-w-0 cursor-pointer sm:max-w-48"
 						value={task.workspaceId ?? ''}
 						aria-label={`Move "${task.title}" to`}
 						onchange={(e) => onmove(task.id, e.currentTarget.value || undefined)}
@@ -256,6 +272,7 @@
 								class="inp mt-1 min-h-24 py-2"
 								bind:value={draftNotes}
 								maxlength={MAX_NOTES_LENGTH}
+								autocomplete="off"
 								placeholder="project notes"
 								onblur={saveNotes}></textarea>
 						</label>
