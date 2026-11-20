@@ -453,3 +453,29 @@ test('sections of the page are set apart by a rule', async ({ page }) => {
 		expect(width, selector).toBe('2px');
 	}
 });
+
+test('the DO IT button lines up with the first line of the title, in the list and in the day panel', async ({
+	page
+}) => {
+	await page.setViewportSize({ width: 390, height: 900 });
+	const today = await day(page, 0);
+	await addTask(page, 'Buy milk', today);
+	await addTask(
+		page,
+		'Write the quarterly report for the whole team and send it today please',
+		today
+	);
+	await page.getByTestId('day-panel').scrollIntoViewIfNeeded();
+	const rows = page.getByRole('checkbox');
+	await expect(rows).toHaveCount(4);
+	for (let i = 0; i < 4; i++) {
+		const gap = await rows.nth(i).evaluate((b) => {
+			const chip = b.querySelector('.chip')!.getBoundingClientRect();
+			const range = document.createRange();
+			range.selectNodeContents(b.lastElementChild!);
+			const line = range.getClientRects()[0];
+			return Math.abs(chip.top + chip.height / 2 - (line.top + line.height / 2));
+		});
+		expect(gap).toBeLessThanOrEqual(1);
+	}
+});

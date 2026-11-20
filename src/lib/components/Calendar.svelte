@@ -316,7 +316,9 @@
 									<span>{task.done ? '[X]' : '[ ]'}</span>
 									<span>{gated ? 'AUTO' : task.done ? 'UNDO' : 'DO IT'}</span>
 								</span>
-								<span class="wrap flex-1 pt-2" class:line-through={task.done}>{task.title}</span>
+								<span class="wrap flex-1 pt-[9px] leading-[22px]" class:line-through={task.done}
+									>{task.title}</span
+								>
 							</button>
 							<div class="flex flex-wrap items-center gap-2">
 								<span class="tag">{task.complexity.toUpperCase()}</span>

@@ -153,7 +153,7 @@
 				<span>{gated ? 'AUTO' : task.done ? 'UNDO' : 'DO IT'}</span>
 			</span>
 			<span
-				class="wrap flex-1 pt-2.5 transition-opacity duration-200"
+				class="wrap flex-1 pt-[11px] leading-[22px] transition-opacity duration-200"
 				class:line-through={task.done}
 				class:opacity-75={task.done}
 			>
